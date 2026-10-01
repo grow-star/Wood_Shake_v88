@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wood Shake Workbench</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #60708a;
+      --line: #d8dfeb;
+      --accent: #2f6fed;
+      --accent-dark: #1e54b7;
+      --ok-bg: #eaf7ef;
+      --ok-border: #a9dfbd;
+      --ok-ink: #176536;
+      --err-bg: #fff0f0;
+      --err-border: #f0b8b8;
+      --err-ink: #8b1d1d;
+      --warn-bg: #fff8e8;
+      --warn-border: #ecd28c;
+      --shadow: 0 18px 45px rgba(23, 32, 51, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(47, 111, 237, 0.12), transparent 34rem),
+        var(--bg);
+    }
+
+    .shell {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0;
+    }
+
+    .header {
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.72);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      margin: 14px 0 6px;
+      font-size: clamp(32px, 5vw, 48px);
+      line-height: 1.05;
+    }
+
+    .subhead {
+      margin: 0;
+      max-width: 740px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.5;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .drop-zone {
+      position: relative;
+      display: block;
+      width: 100%;
+      min-height: 142px;
+      margin-bottom: 16px;
+      border: 2px dashed var(--line);
+      border-radius: 18px;
+      background: #fbfcff;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+      overflow: hidden;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: #f1f6ff;
+      transform: translateY(-1px);
+    }
+
+    .drop-zone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .drop-content {
+      height: 100%;
+      min-height: 142px;
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .drop-title {
+      margin: 0 0 7px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .required {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      margin-left: 6px;
+    }
+
+    .drop-help {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .logo-preview {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      height: 72px;            /* the report's display floor — preview what the report shows */
+      min-width: 72px;
+      max-width: 240px;
+    }
+    .logo-preview.visible { display: flex; }
+    .logo-preview img {
+      height: 72px;            /* 72px floor; width follows the aspect ratio */
+      width: auto;
+      max-width: 240px;
+      display: block;
+      background: transparent;  /* transparency preserved — no white box */
+    }
+    .prepared-by-field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin: 0 0 16px;
+    }
+    .pb-label { font-size: 15px; font-weight: 800; }
+    .pb-hint { font-weight: 500; color: var(--muted); font-size: 13px; }
+    #preparedBy {
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: inherit;
+      background: #fbfcff;
+    }
+    #preparedBy:focus { outline: none; border-color: var(--accent); background: #f1f6ff; }
+
+    .file-pill {
+      display: none;
+      margin-top: 12px;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .file-pill.visible { display: inline-flex; }
+
+    .file-name {
+      max-width: 320px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .clear-btn {
+      border: 0;
+      border-radius: 999px;
+      background: #eef2f8;
+      color: var(--muted);
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      padding: 0;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .clear-btn:hover { color: var(--ink); }
+
+    .icon {
+      flex: 0 0 auto;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: #eef4ff;
+      color: var(--accent);
+      font-size: 26px;
+      font-weight: 900;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button.primary,
+    button.secondary {
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 18px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #ffffff;
+      min-width: 132px;
+    }
+
+    button.primary:hover:not(:disabled) { background: var(--accent-dark); }
+
+    button.primary:disabled {
+      background: #aeb9cc;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      display: none;
+      background: #edf2fa;
+      color: var(--ink);
+    }
+
+    button.secondary.visible { display: inline-flex; }
+
+    .status {
+      display: none;
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .status.visible { display: block; }
+    .status.loading { background: var(--warn-bg); border: 1px solid var(--warn-border); color: #665015; }
+    .status.success { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-ink); }
+    .status.error { background: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-ink); }
+
+    .status strong { display: block; margin-bottom: 4px; }
+
+    .instructions {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      background: #fbfcff;
+    }
+
+    .instructions h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .instructions ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .server-note {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+
+    .shake-profile {
+      margin: 4px 0 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      background: #fbfcff;
+    }
+    .shake-profile h2 { margin: 0 0 6px; font-size: 18px; }
+    .shake-profile .profile-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .field label { display: block; font-weight: 800; font-size: 13px; margin-bottom: 5px; }
+    .field input, .field select { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px; font: inherit; background: white; }
+    .field .help { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .profile-warning { display:none; margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: #665015; font-size: 13px; line-height: 1.4; }
+    .profile-warning.visible { display:block; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 6px;
+      background: #eef2f8;
+      color: var(--ink);
+    }
+
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      .panel { padding: 18px; }
+      .drop-content { align-items: flex-start; }
+      .icon { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="eyebrow">Wood Shake Tool · Page 1 Intake</div>
+      <h1>Wood Shake Workbench</h1>
+      <p class="subhead">Load an EagleView XML, optionally attach the carrier estimate, and confirm the roof inventory before creating repair events.</p>
+    </header>
+
+    <section class="panel" aria-label="Resume a saved claim">
+      <label class="drop-zone" id="claimDrop" for="claimInput" tabindex="0" role="button" aria-label="Load a saved claim file">
+        <input id="claimInput" type="file" accept=".wsclaim,application/json" />
+        <div class="drop-content">
+          <div>
+            <p class="drop-title">Resume a saved claim</p>
+            <p class="drop-help">Open a <code>.wsclaim</code> file to restore a whole claim and jump straight to its report. Photos are re-attached from the claim folder; the report reproduces exactly.</p>
+            <span class="file-pill" id="claimPill"><span class="file-name" id="claimName"></span></span>
+          </div>
+          <div class="icon">OPEN</div>
+        </div>
+      </label>
+      <div class="profile-warning" id="claimError" role="alert"></div>
+    </section>
+
+    <section class="panel" aria-label="Project intake">
+      <div class="grid">
+        <div>
+          <label class="drop-zone" id="xmlDrop" for="xmlInput" tabindex="0" role="button" aria-label="Upload EagleView XML or TXT file">
+            <input id="xmlInput" type="file" accept=".xml,.txt,text/xml,text/plain" />
+            <div class="drop-content">
+              <div>
+                <p class="drop-title">EagleView Report (XML)<span class="required">Required</span></p>
+                <p class="drop-help">Drag and drop the EagleView XML or TXT file here, or click to browse.</p>
+                <span class="file-pill" id="xmlPill"><span class="file-name" id="xmlName"></span><button class="clear-btn" id="clearXml" type="button" aria-label="Clear EagleView file">×</button></span>
+              </div>
+              <div class="icon">XML</div>
+            </div>
+          </label>
+
+
+          <section class="shake-profile" aria-label="Shake field measurements">
+            <h2>Shake measurements</h2>
+            <p class="profile-note">Enter field-measured dimensions when available. Defaults are labeled default — not field-measured and are used only when the roof has not been measured.</p>
+            <div class="profile-grid">
+              <div class="field">
+                <label for="shakeWidth">Average width (in)</label>
+                <input id="shakeWidth" type="number" min="3" max="14" step="0.1" value="7" />
+                <p class="help">Typical 6–8 in; valid range 3–14 in. This one width drives count and stagger.</p>
+              </div>
+              <div class="field">
+                <label for="shakeExposure">Exposure (in)</label>
+                <input id="shakeExposure" type="number" min="1" max="12" step="0.1" value="10" />
+                <p class="help">Measure butt-to-butt. Code max: 24 in → 10; 18 in/thin → 7.5.</p>
+              </div>
+              <div class="field">
+                <label for="shakeLength">Length</label>
+                <select id="shakeLength">
+                  <option value="24" selected>24 in</option>
+                  <option value="18">18 in</option>
+                </select>
+                <p class="help">Used for exposure validation and report material description.</p>
+              </div>
+              <div class="field">
+                <label for="shakeThickness">Thickness</label>
+                <select id="shakeThickness">
+                  <option value="3/4" selected>3/4 heavy</option>
+                  <option value="1/2">1/2 medium</option>
+                  <option value="1">1 jumbo</option>
+                  <option value="3/8">3/8 thin</option>
+                </select>
+                <p class="help">Thin 24 in shakes use the 7.5 in exposure cap.</p>
+              </div>
+              <div class="field">
+                <label for="soffitDepth">Soffit depth (in)</label>
+                <input id="soffitDepth" type="number" min="0" max="48" step="0.5" placeholder="e.g. 12" />
+                <p class="help">Measured overhang depth. Sets the eave ice &amp; water coverage width and layer count. Leave blank if not measured.</p>
+              </div>
+            </div>
+            <div class="profile-warning" id="profileWarning"></div>
+          </section>
+
+          <label class="drop-zone" id="estimateDrop" for="estimateInput" tabindex="0" role="button" aria-label="Upload optional carrier estimate">
+            <input id="estimateInput" type="file" accept=".pdf,.txt,.xml,application/pdf,text/plain,text/xml" />
+            <div class="drop-content">
+              <div>
+                <p class="drop-title">Carrier Estimate (optional)</p>
+                <p class="drop-help">Attach a PDF, TXT, or XML estimate now, or skip it and reconcile later.</p>
+                <span class="file-pill" id="estimatePill"><span class="file-name" id="estimateName"></span><button class="clear-btn" id="clearEstimate" type="button" aria-label="Clear carrier estimate">×</button></span>
+              </div>
+              <div class="icon">EST</div>
+            </div>
+          </label>
+
+          <label class="drop-zone" id="logoDrop" for="logoInput" tabindex="0" role="button" aria-label="Upload your company logo">
+            <input id="logoInput" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" />
+            <div class="drop-content">
+              <div>
+                <p class="drop-title">Report Logo (optional)</p>
+                <p class="drop-help">Upload your company logo (PNG, JPG, or SVG). It is embedded in every report you create on this device and is <strong>kept when you start a new claim</strong>.</p>
+                <span class="file-pill" id="logoPill"><span class="file-name" id="logoName"></span><button class="clear-btn" id="clearLogo" type="button" aria-label="Remove logo">×</button></span>
+              </div>
+              <div class="logo-preview" id="logoPreview" aria-hidden="true"></div>
+            </div>
+          </label>
+          <div class="profile-warning" id="logoWarning"></div>
+
+          <label class="prepared-by-field" for="preparedBy">
+            <span class="pb-label">Prepared by <span class="pb-hint">(optional — appears in the report subtitle)</span></span>
+            <input id="preparedBy" type="text" maxlength="80" placeholder="e.g. Rhoden Roofing LLC" autocomplete="organization" />
+          </label>
+
+          <div class="actions">
+            <button class="primary" id="nextButton" type="button" disabled>Next</button>
+            <button class="secondary" id="continueButton" type="button">Continue to Scope →</button>
+          </div>
+
+          <div class="status" id="statusPanel" aria-live="polite"></div>
+        </div>
+
+        <aside class="instructions">
+          <h2>How to use</h2>
+          <ol>
+            <li>Drop your EagleView XML.</li>
+            <li>Optionally add the carrier estimate.</li>
+            <li>Click Next to load the roof.</li>
+            <li>Create repair events on the next screen.</li>
+          </ol>
+          <div class="server-note">
+            The engine runs in your browser — no install needed. First load takes a few seconds.
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { ready, roofLayout } from './pyodide_bridge.js';
+
+    const state = {
+      xmlFile: null,
+      estimateFile: null,
+      xmlText: '',
+      roofData: null,
+      shakeMeasurements: null,
+      estimateText: '',            // Layer A: text layer of the uploaded carrier estimate ('' if a scan)
+      restoredEstimate: null
+    };
+
+    const xmlInput = document.getElementById('xmlInput');
+    const estimateInput = document.getElementById('estimateInput');
+    const nextButton = document.getElementById('nextButton');
+    const continueButton = document.getElementById('continueButton');
+    const statusPanel = document.getElementById('statusPanel');
+
+
+    function currentShakeMeasurements() {
+      const width = Number(document.getElementById('shakeWidth').value);
+      const exposure = Number(document.getElementById('shakeExposure').value);
+      const length = Number(document.getElementById('shakeLength').value);
+      const thickness = document.getElementById('shakeThickness').value;
+      const maxExposure = (length === 18 || thickness === '3/8') ? 7.5 : 10;
+      const warnings = [];
+      if (!Number.isFinite(width) || width <= 0) throw new Error('Shake width must be greater than 0.');
+      if (width < 3) throw new Error('Shake width must be at least 3.0 in so the width/2 stagger satisfies the 1.5 in joint-offset floor.');
+      if (width > 14) throw new Error('Shake width exceeds the sane 14 in upper bound.');
+      if (!Number.isFinite(exposure) || exposure <= 0) throw new Error('Exposure must be greater than 0.');
+      if (exposure > length / 2) throw new Error('Exposure exceeds the sane length/2 upper bound.');
+      if (exposure > maxExposure) warnings.push('Exposure exceeds the code max for the selected length/thickness (' + maxExposure + ' in). Allowed with warning because field reality may differ; document it with photos.');
+      const soffitRaw = (document.getElementById('soffitDepth') || {}).value;
+      const soffit_depth_in = (soffitRaw === '' || soffitRaw == null || !Number.isFinite(Number(soffitRaw))) ? null : Number(soffitRaw);
+      return { width_in: width, exposure_in: exposure, length_in: length, thickness, measurement_source: 'default — not field-measured', exposure_over_code_max: exposure > maxExposure, code_max_exposure_in: maxExposure, warnings, soffit_depth_in };
+    }
+
+    function refreshProfileWarning() {
+      const warning = document.getElementById('profileWarning');
+      try {
+        const profile = currentShakeMeasurements();
+        if (profile.warnings.length) { warning.textContent = profile.warnings.join(' '); warning.classList.add('visible'); }
+        else { warning.textContent = ''; warning.classList.remove('visible'); }
+      } catch (error) { warning.textContent = error.message; warning.classList.add('visible'); }
+    }
+
+    function setStatus(kind, title, message) {
+      statusPanel.className = 'status visible ' + kind;
+      statusPanel.innerHTML = '<strong>' + escapeHtml(title) + '</strong>' + escapeHtml(message);
+    }
+
+    function clearStatus() {
+      statusPanel.className = 'status';
+      statusPanel.textContent = '';
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, function (char) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char];
+      });
+    }
+
+    function updateNextState() {
+      nextButton.disabled = !state.xmlFile;
+    }
+
+    function showFile(kind, file) {
+      const pill = document.getElementById(kind + 'Pill');
+      const name = document.getElementById(kind + 'Name');
+      if (file) {
+        name.textContent = file.name;
+        pill.classList.add('visible');
+      } else {
+        name.textContent = '';
+        pill.classList.remove('visible');
+      }
+    }
+
+    function assignFile(kind, file) {
+      if (kind === 'xml') {
+        state.xmlFile = file;
+        state.xmlText = '';
+        state.roofData = null;
+        // A new/changed roof abandons any in-progress claim: clear all downstream + restore state
+        // so nothing stale rehydrates on page 1, 2, or 3.
+        ['claimState', 'page2Selection', 'page2Restore', 'page2Payload', 'loadNotice'].forEach(function (k) {
+          sessionStorage.removeItem('woodShakeWorkbench.' + k);
+        });
+        state.restoredEstimate = null;
+      } else {
+        state.estimateFile = file;
+        state.estimateText = '';                       // a new estimate invalidates the old text
+        sessionStorage.removeItem('woodShakeWorkbench.carrierConfirmation');
+      }
+      continueButton.classList.remove('visible');
+      clearStatus();
+      showFile(kind, file);
+      updateNextState();
+    }
+
+    function setupDropZone(dropId, input, kind) {
+      const drop = document.getElementById(dropId);
+
+      drop.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          input.click();
+        }
+      });
+
+      input.addEventListener('change', function () {
+        assignFile(kind, input.files && input.files[0] ? input.files[0] : null);
+      });
+
+      ['dragenter', 'dragover'].forEach(function (eventName) {
+        drop.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          drop.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(function (eventName) {
+        drop.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          drop.classList.remove('dragover');
+        });
+      });
+
+      drop.addEventListener('drop', function (event) {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) assignFile(kind, file);
+      });
+    }
+
+    function readFileAsText(file) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result || '')); };
+        reader.onerror = function () { reject(new Error('Could not read the selected XML file.')); };
+        reader.readAsText(file);
+      });
+    }
+
+    // ---- LAYER A support: pull the TEXT LAYER out of the uploaded carrier estimate ----
+    // PDFs go through pdf.js; .txt/.xml are read directly. A scanned/photo PDF has no text
+    // layer and yields '' — that is NOT an error: page 3 detects it and offers manual entry.
+    const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    let pdfjsPromise = null;
+
+    function loadPdfJs() {
+      if (pdfjsPromise) return pdfjsPromise;
+      pdfjsPromise = new Promise(function (resolve, reject) {
+        if (window.pdfjsLib) return resolve(window.pdfjsLib);
+        const s = document.createElement('script');
+        s.src = PDFJS_URL;
+        s.onload = function () {
+          if (!window.pdfjsLib) return reject(new Error('pdf.js failed to load.'));
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+          resolve(window.pdfjsLib);
+        };
+        s.onerror = function () { reject(new Error('pdf.js could not be fetched.')); };
+        document.head.appendChild(s);
+      });
+      return pdfjsPromise;
+    }
+
+    async function extractEstimateText(file) {
+      if (!file) return '';
+      const name = String(file.name || '').toLowerCase();
+      const isPdf = name.endsWith('.pdf') || String(file.type || '').includes('pdf');
+      if (!isPdf) {
+        try { return await readFileAsText(file); } catch (_e) { return ''; }
+      }
+      try {
+        const pdfjsLib = await loadPdfJs();
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const pages = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const content = await page.getTextContent();
+          // Rebuild lines from the text items using their y-position, so label/value pairs
+          // ("Claim Number: 1698K776J") stay on one line for Layer A's label matching.
+          const rows = new Map();
+          for (const item of content.items) {
+            const y = Math.round((item.transform && item.transform[5]) || 0);
+            if (!rows.has(y)) rows.set(y, []);
+            rows.get(y).push({ x: (item.transform && item.transform[4]) || 0, s: item.str });
+          }
+          const ordered = Array.from(rows.entries()).sort((a, b) => b[0] - a[0]);
+          for (const [, parts] of ordered) {
+            parts.sort((a, b) => a.x - b.x);
+            const line = parts.map(p => p.s).join(' ').replace(/\s{2,}/g, ' ').trim();
+            if (line) pages.push(line);
+          }
+          pages.push('Page: ' + p);          // page marker: lets Layer A drop the sample page
+        }
+        return pages.join('\n');
+      } catch (_e) {
+        return '';                           // unreadable/scanned -> page 3 falls back to manual entry
+      }
+    }
+
+    async function checkHealth() {
+      await ready();
+    }
+
+    async function loadRoof(xmlText) {
+      return await roofLayout(xmlText);
+    }
+
+    async function handleNext() {
+      if (!state.xmlFile) return;
+
+      nextButton.disabled = true;
+      continueButton.classList.remove('visible');
+      setStatus('loading', 'Loading roof…', 'Loading the engine in your browser (first load takes a few seconds)…');
+
+      try {
+        const xmlText = await readFileAsText(state.xmlFile);
+        state.xmlText = xmlText;
+
+        try {
+          await checkHealth();
+        } catch (healthError) {
+          throw new Error('The engine failed to load in the browser. Refresh and try again.');
+        }
+
+        const shakeMeasurements = currentShakeMeasurements();
+        const roofData = await loadRoof(xmlText);
+        state.roofData = roofData;
+        state.shakeMeasurements = shakeMeasurements;
+
+        const facetCount = Array.isArray(roofData.facets) ? roofData.facets.length : 0;
+        const valleyCount = Array.isArray(roofData.valleys) ? roofData.valleys.length : 0;
+        const penetrationCount = Array.isArray(roofData.penetrations) ? roofData.penetrations.length : 0;
+
+        // Layer A: pull the text layer out of the carrier estimate now, so page 3 can prefill
+        // from the REAL statement. No text (a scan/photo) is not an error — page 3 will offer
+        // manual entry instead.
+        state.estimateText = '';
+        let estimateNote = 'No estimate — carrier reconciliation will be skipped.';
+        if (state.estimateFile) {
+          state.estimateText = await extractEstimateText(state.estimateFile);
+          // v73 DEFECT 3: a scan / "Microsoft: Print To PDF" has NO text layer — the reader returns
+          // only the page markers it inserts and no real characters, which Layer A then reports as
+          // "partially read — 0 lines" (looks like a parser failure). DETECT it and SAY SO. Threshold
+          // (deterministic, no OCR): after removing the "Page: N" markers, fewer than 40 non-space
+          // characters total, OR under 3 non-space characters per page — a yield far below what the
+          // page count implies. Hand page 3 EMPTY text so it offers clean manual entry, not marker noise.
+          const pageCount = (state.estimateText.match(/^Page:\s*\d+\s*$/gm) || []).length || 1;
+          const realChars = state.estimateText.replace(/^Page:\s*\d+\s*$/gm, '').replace(/\s/g, '').length;
+          const textless = realChars < 40 || (realChars / pageCount) < 3;
+          if (textless) {
+            state.estimateText = '';
+            estimateNote = 'This PDF has no text layer (it is a scan or a print-to-PDF). Line items '
+              + 'cannot be read from it — enter them manually on the next screens.';
+          } else {
+            estimateNote = 'Carrier estimate read: ' + state.estimateFile.name + '.';
+          }
+        }
+
+        setStatus(
+          'success',
+          'Roof loaded',
+          'Roof loaded: ' + facetCount + ' facets · ' + valleyCount + ' valleys · ' + penetrationCount + ' penetrations detected. ' + estimateNote
+        );
+        continueButton.classList.add('visible');
+      } catch (error) {
+        setStatus('error', 'Could not load roof', error && error.message ? error.message : 'An unknown error occurred.');
+      } finally {
+        updateNextState();
+      }
+    }
+
+    setupDropZone('xmlDrop', xmlInput, 'xml');
+    setupDropZone('estimateDrop', estimateInput, 'estimate');
+
+    document.getElementById('clearXml').addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      xmlInput.value = '';
+      assignFile('xml', null);
+    });
+
+    document.getElementById('clearEstimate').addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      estimateInput.value = '';
+      assignFile('estimate', null);
+    });
+
+    ['shakeWidth','shakeExposure','shakeLength','shakeThickness'].forEach(function (id) { document.getElementById(id).addEventListener('input', refreshProfileWarning); });
+    refreshProfileWarning();
+
+    nextButton.addEventListener('click', handleNext);
+
+    continueButton.addEventListener('click', function () {
+      if (!state.xmlText || !state.roofData) {
+        alert('Load the roof first.');
+        return;
+      }
+
+      // Fresh intake: clear any downstream claim state so a new roof can't restore stale page-3 data.
+      sessionStorage.removeItem('woodShakeWorkbench.claimState');
+      sessionStorage.removeItem('woodShakeWorkbench.page2Selection');
+
+      sessionStorage.setItem('woodShakeWorkbench.page2Payload', JSON.stringify({
+        xmlText: state.xmlText,
+        roofData: state.roofData,
+        estimate: state.estimateFile
+          ? { name: state.estimateFile.name, type: state.estimateFile.type, size: state.estimateFile.size }
+          : (state.restoredEstimate || null),   // restored claim keeps its carrier-estimate flag (File can't be re-held)
+        estimateText: state.estimateText || '', // Layer A input for page 3 ('' -> manual entry)
+        shakeMeasurements: state.shakeMeasurements || currentShakeMeasurements()
+      }));
+      window.location.href = './page2.html';
+    });
+
+    // ===================== Restore intake on load (returning to an in-progress claim) =====================
+    // The browser cannot re-populate a file <input> for security reasons, so the chosen-file label stays
+    // empty even when data is restored. We restore the parsed roof + measurements + carrier flag from
+    // sessionStorage and show a clear "roof loaded (restored)" state so the user is not forced to re-pick.
+    function restoreIntakeOnLoad() {
+      let payload = null;
+      try {
+        const raw = sessionStorage.getItem('woodShakeWorkbench.page2Payload');
+        payload = raw ? JSON.parse(raw) : null;
+      } catch (_e) { payload = null; }
+      // No in-progress claim -> page 1 behaves exactly as today (blank).
+      if (!payload || !payload.xmlText || !payload.roofData) return;
+
+      state.xmlText = payload.xmlText;
+      state.roofData = payload.roofData;
+      state.shakeMeasurements = payload.shakeMeasurements || null;
+      state.restoredEstimate = payload.estimate || null;   // keep the carrier-estimate flag for Continue
+      state.estimateText = payload.estimateText || '';     // keep the parsed estimate text too
+
+      const sm = payload.shakeMeasurements;
+      if (sm) {
+        if (Number.isFinite(sm.width_in)) document.getElementById('shakeWidth').value = sm.width_in;
+        if (Number.isFinite(sm.exposure_in)) document.getElementById('shakeExposure').value = sm.exposure_in;
+        if (sm.length_in != null) document.getElementById('shakeLength').value = String(sm.length_in);
+        if (sm.thickness != null) document.getElementById('shakeThickness').value = String(sm.thickness);
+        refreshProfileWarning();
+      }
+
+      const facetCount = Array.isArray(state.roofData.facets) ? state.roofData.facets.length : 0;
+      const valleyCount = Array.isArray(state.roofData.valleys) ? state.roofData.valleys.length : 0;
+      const penetrationCount = Array.isArray(state.roofData.penetrations) ? state.roofData.penetrations.length : 0;
+      const estimateNote = state.restoredEstimate
+        ? 'Carrier estimate still attached: ' + (state.restoredEstimate.name || 'attached') + '.'
+        : 'No estimate — carrier reconciliation will be skipped.';
+
+      setStatus('success', 'Roof loaded (restored)',
+        'Restored in-progress claim: ' + facetCount + ' facets · ' + valleyCount + ' valleys · '
+        + penetrationCount + ' penetrations. ' + estimateNote
+        + ' The file picker looks empty (browsers can\u2019t refill it) but your data is loaded \u2014 continue without re-selecting.');
+      continueButton.classList.add('visible');
+      updateNextState();
+    }
+    restoreIntakeOnLoad();
+
+    // ===================== Report branding (per-device, NOT per-claim) =====================
+    // The logo + "Prepared by" text live in localStorage under keys deliberately SEPARATE from the
+    // sessionStorage claim state, so a claim reset / new claim never wipes them. The bridge reads
+    // these same keys when it builds the report on page 4. A distinct "remove logo" control clears
+    // the logo without touching the claim.
+    const LOGO_KEY = 'woodShakeBranding.logoDataUri';
+    const PREP_KEY = 'woodShakeBranding.preparedBy';
+    const LOGO_FLOOR_PX = 72;                         // the report's display-height floor
+
+    const logoInput = document.getElementById('logoInput');
+    const logoPreview = document.getElementById('logoPreview');
+    const logoName = document.getElementById('logoName');
+    const logoPill = document.getElementById('logoPill');
+    const logoWarning = document.getElementById('logoWarning');
+    const preparedByInput = document.getElementById('preparedBy');
+
+    function setLogoWarning(msg) {
+      if (msg) { logoWarning.textContent = msg; logoWarning.classList.add('visible'); }
+      else { logoWarning.textContent = ''; logoWarning.classList.remove('visible'); }
+    }
+
+    function showLogoPreview(dataUri) {
+      if (dataUri) {
+        const img = document.createElement('img');
+        img.alt = 'Logo preview';
+        img.src = dataUri;
+        logoPreview.innerHTML = '';
+        logoPreview.appendChild(img);
+        logoPreview.classList.add('visible');
+        logoName.textContent = 'Logo saved on this device';
+        logoPill.classList.add('visible');
+      } else {
+        logoPreview.innerHTML = '';
+        logoPreview.classList.remove('visible');
+        logoName.textContent = '';
+        logoPill.classList.remove('visible');
+      }
+    }
+
+    function readDataUrl(file) {
+      return new Promise(function (resolve, reject) {
+        const r = new FileReader();
+        r.onload = function () { resolve(String(r.result || '')); };
+        r.onerror = function () { reject(new Error('Could not read the selected file.')); };
+        r.readAsDataURL(file);
+      });
+    }
+
+    function loadImage(dataUri) {
+      return new Promise(function (resolve, reject) {
+        const img = new Image();
+        img.onload = function () { resolve(img); };
+        img.onerror = function () { reject(new Error('That file is not a readable image.')); };
+        img.src = dataUri;
+      });
+    }
+
+    // Trim fully-transparent margin from a raster logo (Joseph's mark carried ~260px per side, and a
+    // user's upload may too). Returns a PNG data URI with transparency preserved. SVG is left untouched
+    // (it is vector; rasterising it to trim would throw away its resolution independence).
+    function trimTransparent(img) {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) return null;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      let data;
+      try { data = ctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (data[(y * w + x) * 4 + 3] > 10) {
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return null;                      // fully transparent -> nothing to keep
+      const cw = maxX - minX + 1, ch = maxY - minY + 1;
+      if (cw === w && ch === h) return null;          // no margin to trim
+      const oc = document.createElement('canvas'); oc.width = cw; oc.height = ch;
+      oc.getContext('2d').drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+      return { dataUri: oc.toDataURL('image/png'), width: cw, height: ch };
+    }
+
+    async function handleLogoFile(file) {
+      setLogoWarning('');
+      if (!file) return;
+      const isImageType = /^image\//.test(file.type || '');
+      const isImageExt = /\.(png|jpe?g|svg|webp|gif)$/i.test(file.name || '');
+      if (!isImageType && !isImageExt) {
+        setLogoWarning('That is not an image file. Upload a PNG, JPG, or SVG logo.');
+        return;
+      }
+      let dataUri;
+      try { dataUri = await readDataUrl(file); } catch (e) { setLogoWarning(e.message); return; }
+      let img;
+      try { img = await loadImage(dataUri); } catch (e) { setLogoWarning(e.message); return; }
+      const isSvg = /svg/i.test(file.type || '') || /\.svg$/i.test(file.name || '');
+      let finalUri = dataUri, dispH = img.naturalHeight, trimmed = false;
+      if (!isSvg) {
+        const t = trimTransparent(img);
+        if (t) { finalUri = t.dataUri; dispH = t.height; trimmed = true; }
+      }
+      try { localStorage.setItem(LOGO_KEY, finalUri); }
+      catch (e) { setLogoWarning('Could not save the logo — browser storage is full.'); return; }
+      showLogoPreview(finalUri);
+      // Warn ON SCREEN ONLY (never in the report) when the source is too small to stay crisp at 72px.
+      const notes = [];
+      if (trimmed) notes.push('Transparent margin trimmed.');
+      if (!isSvg && dispH && dispH < LOGO_FLOOR_PX) {
+        notes.push('This logo is only ' + dispH + 'px tall; at the ' + LOGO_FLOOR_PX +
+          'px minimum display height it will be upscaled and small text may look soft. Upload a taller '
+          + 'image (' + LOGO_FLOOR_PX + 'px+, ideally ' + (LOGO_FLOOR_PX * 2) + 'px) for a crisp mark.');
+      }
+      setLogoWarning(notes.join(' '));
+    }
+
+    logoInput.addEventListener('change', function () {
+      handleLogoFile(logoInput.files && logoInput.files[0] ? logoInput.files[0] : null);
+    });
+
+    (function setupLogoDrop() {
+      const drop = document.getElementById('logoDrop');
+      drop.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); logoInput.click(); }
+      });
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('dragover'); });
+      });
+      drop.addEventListener('drop', function (e) {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) handleLogoFile(f);
+      });
+    })();
+
+    document.getElementById('clearLogo').addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      logoInput.value = '';
+      try { localStorage.removeItem(LOGO_KEY); } catch (_e) {}
+      showLogoPreview('');
+      setLogoWarning('');
+    });
+
+    preparedByInput.addEventListener('input', function () {
+      try { localStorage.setItem(PREP_KEY, preparedByInput.value); } catch (_e) {}
+    });
+
+    (function restoreBranding() {
+      let logo = '', prep = '';
+      try { logo = localStorage.getItem(LOGO_KEY) || ''; } catch (_e) {}
+      try { prep = localStorage.getItem(PREP_KEY) || ''; } catch (_e) {}
+      if (logo) showLogoPreview(logo);
+      if (prep) preparedByInput.value = prep;
+    })();
+
+    // ===================== RESUME A SAVED CLAIM FROM A FILE =====================
+    // Reads a .wsclaim file, validates it FULLY before touching anything, restores the whole claim to
+    // sessionStorage, and jumps to the report. A corrupt or foreign file is refused with a clear
+    // message and the current claim is left exactly as it was - it never half-loads. Branding is NOT
+    // read from the file (it stays the local device's localStorage), so a loaded claim shows THIS
+    // company's logo, never the sender's.
+    const CLAIM_FILE_FORMAT = 'woodshake-claim';
+    const CLAIM_FILE_VERSION = 'v81';                 // MUST match the version constant in page4.html
+    const CLAIM_PREFIX = 'woodShakeWorkbench.';
+    const CLAIM_KEYS = ['claimState', 'page2Payload', 'page2Selection',
+                        'page2Restore', 'carrierConfirmation', 'reportEvidence'];
+
+    function parseClaimFile(text) {
+      let obj;
+      try { obj = JSON.parse(text); }
+      catch (_e) { throw new Error('This file could not be read as a claim (it is not valid JSON). Your current claim is unchanged.'); }
+      if (!obj || typeof obj !== 'object' || obj.format !== CLAIM_FILE_FORMAT
+          || !obj.state || typeof obj.state !== 'object') {
+        throw new Error('This is not a Wood Shake claim file. Your current claim is unchanged.');
+      }
+      if (!obj.state.claimState || typeof obj.state.claimState !== 'object'
+          || !obj.state.claimState.uiSelection) {
+        throw new Error('This claim file is incomplete or corrupt - the roof selection is missing. Your current claim is unchanged.');
+      }
+      return obj;
+    }
+
+    function applyClaimToSession(obj) {
+      // Atomic replace: clear the six claim keys, then write only those present in the file. Reached
+      // ONLY after parseClaimFile validated the whole file, so a bad file never gets this far.
+      CLAIM_KEYS.forEach(function (k) { sessionStorage.removeItem(CLAIM_PREFIX + k); });
+      CLAIM_KEYS.forEach(function (k) {
+        if (obj.state[k] !== undefined) sessionStorage.setItem(CLAIM_PREFIX + k, JSON.stringify(obj.state[k]));
+      });
+      const ev = obj.state.reportEvidence;
+      const pending = (ev && Array.isArray(ev.photos)) ? ev.photos.map(function (p) { return p.name || '(unnamed photo)'; }) : [];
+      sessionStorage.setItem(CLAIM_PREFIX + 'loadNotice', JSON.stringify({
+        fromVersion: obj.version || '(unknown)', runningVersion: CLAIM_FILE_VERSION,
+        versionMismatch: obj.version !== CLAIM_FILE_VERSION, photosPending: pending
+      }));
+    }
+
+    async function handleClaimFile(file) {
+      const err = document.getElementById('claimError');
+      err.classList.remove('visible'); err.textContent = '';
+      let text;
+      try { text = await file.text(); }
+      catch (_e) { err.textContent = 'That file could not be read.'; err.classList.add('visible'); return; }
+      let obj;
+      try { obj = parseClaimFile(text); }              // full validation BEFORE any write
+      catch (e) { err.textContent = e.message; err.classList.add('visible'); return; }
+      applyClaimToSession(obj);                          // only runs on a valid file
+      window.location.href = './page4.html';            // resume at the report; Back reaches pages 3 & 2
+    }
+
+    (function wireClaimLoad() {
+      const input = document.getElementById('claimInput');
+      const zone = document.getElementById('claimDrop');
+      if (!input || !zone) return;
+      input.addEventListener('change', function (e) {
+        const fl = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (fl) handleClaimFile(fl);
+      });
+      zone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+      });
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove('dragover'); });
+      });
+      zone.addEventListener('drop', function (e) {
+        const fl = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (fl) handleClaimFile(fl);
+      });
+    })();
+  </script>
+</body>
+</html>

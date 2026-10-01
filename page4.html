@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Repair scope report — Wood Shake Workbench</title>
+  <style>
+    :root {
+      --ink: #1f2733; --muted: #5b6573; --line: #d8dfeb; --accent: #33485e;
+      --bg: #eef1f4; --card: #fff; --warn: #a8710f; --warn-bg: #fdf3e0; --err: #a3282b; --err-bg: #fdeaea;
+    }
+
+    /* v86 — live/manual report-update toggle, matching page 2's compute-mode toggle. */
+    .mode-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .mode-label { font-weight: 800; font-size: 13px; }
+    .mode-toggle { display: inline-flex; border: 1px solid var(--line); background: #eef2f8;
+      border-radius: 999px; padding: 3px; gap: 3px; flex: 0 0 auto; }
+    .mode-toggle button { border: 0; border-radius: 999px; padding: 7px 12px; background: transparent;
+      color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .mode-toggle button.on { background: var(--accent); color: #fff; }
+    .mode-action-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .report-stale-note { display: none; color: var(--err); background: var(--err-bg);
+      border: 1px solid var(--err); border-radius: 12px; padding: 8px 10px; font-size: 12px;
+      font-weight: 800; line-height: 1.35; }
+    .report-stale-note.visible { display: block; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45;
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 16px 14px 88px; }
+    header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    h1 { font-size: 19px; margin: 0; }
+    .step { font-size: 12px; color: var(--muted); }
+    .statusline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+    .pill { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+      background: #eef2f8; color: var(--accent); }
+    .pill.mode { background: #e8f5ee; color: #1f7a4d; }
+    .notice { border-radius: 10px; padding: 11px 13px; font-size: 13px; margin-bottom: 12px; display: none; }
+    .notice.show { display: block; }
+    .notice.warn { background: var(--warn-bg); border: 1px solid #e6c98a; color: var(--warn); }
+    .notice.err  { background: var(--err-bg);  border: 1px solid #e6a0a2; color: var(--err); }
+    .reportbox { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      overflow: hidden; min-height: 260px; }
+    #reportFrame { width: 100%; border: 0; display: block; min-height: 60vh; background: #fff; }
+    .loading { padding: 40px 18px; text-align: center; color: var(--muted); font-size: 14px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px; margin-bottom: 14px; }
+    .panel-head h2 { font-size: 16px; margin: 0 0 3px; }
+    .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+    .sub { border-top: 1px dashed var(--line); padding-top: 12px; margin-top: 12px; }
+    .sub h3 { font-size: 14px; margin: 0 0 3px; }
+    .count { font-size: 12px; color: var(--muted); font-weight: 400; }
+    .photo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .photo-card { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fbfcfe; }
+    .photo-card img { width: 100%; height: 96px; object-fit: cover; display: block; }
+    .photo-card input { font: inherit; font-size: 12.5px; padding: 6px 8px; width: 100%; border: 0;
+      border-top: 1px solid var(--line); background: #fff; }
+    .photo-card button { font: inherit; font-size: 12px; width: 100%; padding: 5px; border: 0;
+      border-top: 1px solid var(--line); background: #f4f6f9; color: var(--muted); cursor: pointer; }
+    .photo-card button:hover { color: var(--err); }
+    .photo-ctl { display: flex; gap: 1px; }
+    .photo-ctl button { width: auto; border-top: 1px solid var(--line); }
+    .photo-ctl .ctl-move { flex: 0 0 2.6em; font-size: 14px; line-height: 1; }
+    .photo-ctl .ctl-remove { flex: 1; }
+    .photo-ctl .ctl-move:hover:not(:disabled) { color: var(--ink); background: #e9edf3; }
+    .photo-ctl button:disabled { opacity: .32; cursor: default; }
+    .att-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .att-row input[type=text] { flex: 1; font: inherit; font-size: 14px; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff; min-width: 0; }
+    .att-row label { font-size: 12.5px; color: var(--muted); display: flex; gap: 5px; align-items: center; white-space: nowrap; }
+    .att-row button { font: inherit; font-size: 12px; padding: 7px 10px; border-radius: 8px;
+      border: 1px solid var(--line); background: #f4f6f9; color: var(--muted); cursor: pointer; }
+    .att-row button:hover { color: var(--err); }
+    .addbtn { display: inline-block; padding: 9px 14px; border: 1px dashed #b6c2d2; border-radius: 10px;
+      background: #f6f9fc; color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+    .authoring-actions { display: flex; gap: 10px; align-items: center; margin-top: 14px;
+      border-top: 1px dashed var(--line); padding-top: 12px; }
+    .warn { font-size: 12.5px; color: var(--warn); margin-top: 8px; display: none; }
+    .warn.show { display: block; }
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.96);
+      border-top: 1px solid var(--line); padding: 10px 14px; display: flex; gap: 10px;
+      align-items: center; justify-content: space-between; }
+    .bar .grp { display: flex; gap: 8px; }
+    .btn { font: inherit; font-size: 14px; font-weight: 600; padding: 11px 16px; border-radius: 10px;
+      border: 1px solid var(--line); background: #eef2f8; color: var(--ink); text-decoration: none;
+      cursor: pointer; display: inline-flex; align-items: center; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <h1>Repair scope report</h1>
+      <span class="step">Step 4 of 4</span>
+    </header>
+
+    <div class="statusline">
+      <span class="pill mode" id="modePill">loading…</span>
+      <span id="statusText">Loading the engine in your browser…</span>
+    </div>
+
+    <div class="notice warn" id="claimLoadNotice"></div>
+    <div class="notice warn" id="warnNotice"></div>
+    <div class="notice err" id="errNotice"></div>
+
+    <div class="reportbox">
+      <div class="loading" id="loadingBox">Building the report from your confirmed scope…</div>
+      <iframe id="reportFrame" title="Repair scope report" style="display:none;"></iframe>
+    </div>
+
+    <section class="panel" id="authoring">
+      <div class="panel-head">
+        <h2>Evidence for this report</h2>
+        <p class="hint">Photos and attachments are commentary on the finished scope — you build the report,
+          look at it, then decide what evidence supports it.</p>
+      </div>
+
+      <div class="sub">
+        <h3>Photos <span class="count" id="photoCount"></span></h3>
+        <p class="hint">Photos are what make the measured shake dimensions defensible. Each can carry a caption.</p>
+        <div id="photoList" class="photo-list"></div>
+        <label class="addbtn" for="photoInput">+ Add photos</label>
+        <input id="photoInput" type="file" accept="image/*" multiple hidden />
+        <div class="warn" id="photoWarn"></div>
+      </div>
+
+      <div class="sub">
+        <h3>Attachments</h3>
+        <p class="hint">What is actually included with THIS report. Named only — never priced.</p>
+        <div id="attachList"></div>
+        <button class="addbtn" id="addAttachBtn" type="button">+ Add attachment</button>
+      </div>
+
+      <div class="authoring-actions">
+        <div class="mode-head">
+          <div>
+            <div class="mode-label">Report updates</div>
+            <p class="hint" id="authoringNote">Manual: your edits are saved immediately; press Update now to rebuild the report above.</p>
+          </div>
+          <div class="mode-toggle" role="group" aria-label="Report update mode">
+            <button id="liveModeButton" type="button">Live</button>
+            <button id="manualModeButton" type="button" class="on">Manual</button>
+          </div>
+        </div>
+        <div class="mode-action-row">
+          <button class="btn" id="rebuildBtn" type="button">Update now</button>
+          <div class="report-stale-note" id="reportStaleNote">The preview is behind your edits — press <strong>Update now</strong> to rebuild the report before you print or save.</div>
+        </div>
+      </div>
+    </section>
+
+
+  </div>
+
+  <div class="bar">
+    <a class="btn" id="backBtn" href="./page3.html">← Back</a>
+    <div class="grp">
+      <button class="btn" id="saveClaimBtn" type="button">Save claim</button>
+      <button class="btn" id="downloadBtn" type="button" disabled>Save HTML</button>
+      <button class="btn primary" id="printBtn" type="button" disabled>Print / PDF</button>
+    </div>
+  </div>
+
+  <script type="module">
+    // PAGE 4 = THE REPORT. It CALLS the proven Module 3 engine through the bridge and DISPLAYS what
+    // comes back. Nothing here re-authors the comparison, the divergences, the operation analysis,
+    // or the repair-logic explanations — that is all engine output. The §10.5 language guard runs
+    // inside the engine's safe_export; this page never bypasses or duplicates it.
+
+    import { ready, buildModule3Report } from './pyodide_bridge.js';
+
+    const modePill = document.getElementById('modePill');
+    const statusText = document.getElementById('statusText');
+    const warnNotice = document.getElementById('warnNotice');
+    const errNotice = document.getElementById('errNotice');
+    const loadingBox = document.getElementById('loadingBox');
+    const frame = document.getElementById('reportFrame');
+    const printBtn = document.getElementById('printBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const backBtn = document.getElementById('backBtn');
+
+    let reportHtml = '';
+
+    // ===================== LIVE / MANUAL REPORT-UPDATE MODE (v86) =====================
+    // Page 2 has a Live/Manual compute toggle; page 4 gets the same one for the same reason — on a real
+    // roof a full rebuild is a Pyodide round trip, and rebuilding after every keystroke fights the user.
+    // MANUAL is the default here: on a big roof live is the wrong default, and on a small one manual costs
+    // one click. The preference is PER DEVICE — it lives in localStorage beside the branding keys, never in
+    // the claim file and never in sessionStorage, so a claim handed to a colleague never carries someone
+    // else's authoring preference.
+    const LIVE_MODE_KEY = 'woodShakeBranding.page4LiveMode';
+    let liveMode = false;
+    try { liveMode = localStorage.getItem(LIVE_MODE_KEY) === 'live'; } catch (_e) { liveMode = false; }
+    let reportStale = false;          // an edit changed the evidence but the report has not been rebuilt yet
+
+    const liveModeButton = document.getElementById('liveModeButton');
+    const manualModeButton = document.getElementById('manualModeButton');
+    const rebuildBtn = document.getElementById('rebuildBtn');
+    const reportStaleNote = document.getElementById('reportStaleNote');
+
+    const readJson = (key) => {
+      try { const raw = sessionStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+      catch (_e) { return null; }
+    };
+
+    function showError(msg) {
+      errNotice.textContent = msg;
+      errNotice.classList.add('show');
+      loadingBox.textContent = 'No report.';
+      modePill.textContent = 'error';
+      statusText.textContent = '';
+    }
+
+    // ===================== PAGE 4 IS THE AUTHORING SURFACE =====================
+    // Photos and attachment bullets are COMMENTARY ON THE FINISHED SCOPE, not intake data. You build
+    // the report, look at it, then decide what evidence supports it. So they live here, not on page 1.
+    const EVIDENCE_KEY = 'woodShakeWorkbench.reportEvidence';
+
+    const DEFAULT_ATTACHMENTS = [
+      { label: 'EagleView Report', included: true },
+      { label: 'Carrier Loss Statement', included: true },
+      { label: 'Photographs', included: true }
+    ];
+
+    // photos: [{ id, src (downscaled data URL), caption }]
+    const evidence = { photos: [], attachments: DEFAULT_ATTACHMENTS.map((a) => ({ ...a })) };
+
+    function loadEvidence() {
+      try {
+        const raw = sessionStorage.getItem(EVIDENCE_KEY);
+        const saved = raw ? JSON.parse(raw) : null;
+        if (!saved) return;
+        if (Array.isArray(saved.photos)) evidence.photos = saved.photos;
+        if (Array.isArray(saved.attachments) && saved.attachments.length) evidence.attachments = saved.attachments;
+      } catch (_e) { /* keep the defaults */ }
+    }
+
+    // sessionStorage has a hard quota (~5-10 MB) and raw phone photos will blow straight through it.
+    // Photos are downscaled BEFORE they are stored; if the quota still bites, say so plainly and drop
+    // the photo that would not fit — never crash the app and never lose the report.
+    // Debounced so typing a caption does not re-run the engine on every keystroke, but the report
+    // can never be out of step with the evidence panel for more than a moment.
+    let _renderTimer = null;
+    function scheduleRerender(delay) {
+      if (_renderTimer) clearTimeout(_renderTimer);
+      const note = document.getElementById('authoringNote');
+      if (note) note.textContent = 'Updating the report…';
+      _renderTimer = setTimeout(() => { _renderTimer = null; buildReport(); }, delay || 500);
+    }
+
+    // Every authoring edit routes through here. LIVE keeps the old behaviour (debounced rebuild); MANUAL
+    // never rebuilds while you work — it marks the report STALE and waits for "Update now" (or a print/save,
+    // which rebuilds first — see below). This is the whole fix: authoring edits stop rebuilding unasked.
+    function onEdit(delay) {
+      if (liveMode) { scheduleRerender(delay); }
+      else { markStale(); }
+    }
+
+    function markStale() {
+      reportStale = true;
+      updateModeUi();
+    }
+
+    function updateModeUi() {
+      if (liveModeButton) liveModeButton.classList.toggle('on', liveMode);
+      if (manualModeButton) manualModeButton.classList.toggle('on', !liveMode);
+      const showStale = !liveMode && reportStale;
+      if (reportStaleNote) reportStaleNote.classList.toggle('visible', showStale);
+      if (rebuildBtn) rebuildBtn.classList.toggle('primary', showStale);   // make "Update now" the obvious next action
+      const note = document.getElementById('authoringNote');
+      if (note) {
+        note.textContent = liveMode
+          ? 'Live: the report above rebuilds automatically as you edit. Switch to Manual for faster authoring on a large roof.'
+          : (reportStale
+              ? 'Your edits are saved, but the report above is behind them — press Update now to rebuild it.'
+              : 'Manual: your edits are saved immediately; press Update now to rebuild the report above.');
+      }
+    }
+
+    function setLiveMode(on) {
+      liveMode = !!on;
+      try { localStorage.setItem(LIVE_MODE_KEY, liveMode ? 'live' : 'manual'); } catch (_e) { /* per-device only */ }
+      updateModeUi();
+      if (liveMode && reportStale) buildReport();     // entering Live brings the preview current at once (as page 2 does)
+    }
+
+    function saveEvidence() {
+      const warn = document.getElementById('photoWarn');
+      try {
+        sessionStorage.setItem(EVIDENCE_KEY, JSON.stringify(evidence));
+        warn.classList.remove('show');
+        return true;
+      } catch (err) {
+        if (evidence.photos.length) evidence.photos.pop();       // undo the one that overflowed
+        try { sessionStorage.setItem(EVIDENCE_KEY, JSON.stringify(evidence)); } catch (_e) {}
+        warn.textContent = 'That photo could not be stored — this browser\u2019s storage is full. '
+          + 'Remove a photo and try again; your report is safe.';
+        warn.classList.add('show');
+        renderPhotos();
+        return false;
+      }
+    }
+
+    // Downscale to ~1200 px on the long edge at JPEG ~0.7. A modern phone photo is 3-8 MB; this
+    // brings it to roughly 150-300 KB, which is the difference between storing a handful of photos
+    // and blowing the quota on the first one.
+    const MAX_EDGE = 1200;
+    const JPEG_QUALITY = 0.7;
+
+    function downscaleImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read that image.'));
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('That file is not a readable image.'));
+          img.onload = () => {
+            const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY));
+          };
+          img.src = String(reader.result || '');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Reorder a photo by one slot. dir = -1 moves it earlier (up), +1 later (down). The report order IS
+    // the array order, so this swaps the whole object and the report follows immediately. The re-render is
+    // in place and the scroll position is restored, so moving a photo near the bottom of a long list never
+    // throws the page to the top.
+    // The report iframe sits ABOVE the photo list, and re-rendering it resizes it — which would shift the
+    // list under the user's cursor on every move. movePhoto records the scroll it wants kept, restores it
+    // synchronously, and the iframe's load handler restores it again AFTER the resize settles.
+    let _pendingScroll = null;
+    function movePhoto(i, dir) {
+      const j = i + dir;
+      if (i < 0 || i >= evidence.photos.length || j < 0 || j >= evidence.photos.length) return;
+      const x = window.scrollX, y = window.scrollY;
+      const moved = evidence.photos[i];
+      evidence.photos[i] = evidence.photos[j];
+      evidence.photos[j] = moved;                 // caption, image and pending re-attach state move with it
+      saveEvidence();
+      renderPhotos();
+      window.scrollTo(x, y);
+      _pendingScroll = { x, y };                   // held across the async report resize (see frame load)
+      onEdit(0);                         // §6 follows the new order with no "Update now" click
+    }
+
+    function renderPhotos() {
+      const host = document.getElementById('photoList');
+      document.getElementById('photoCount').textContent =
+        evidence.photos.length ? `(${evidence.photos.length})` : '';
+      // Move up / move down + Remove. The array IS the report order (§6 renders s["photos"] in array
+      // order), so a move is a swap of the WHOLE photo object — its caption, its image and its pending
+      // re-attach state travel with it. "Up" is disabled on the first card and "down" on the last, so no
+      // control is ever rendered that would do nothing.
+      const last = evidence.photos.length - 1;
+      const controls = (i) => `
+          <div class="photo-ctl">
+            <button type="button" class="ctl-move" data-up="${i}" aria-label="Move photo earlier" title="Move up" ${i === 0 ? 'disabled' : ''}>\u2191</button>
+            <button type="button" class="ctl-move" data-down="${i}" aria-label="Move photo later" title="Move down" ${i === last ? 'disabled' : ''}>\u2193</button>
+            <button type="button" class="ctl-remove" data-remove="${i}">Remove</button>
+          </div>`;
+      host.innerHTML = evidence.photos.map((p, i) => p.src ? `
+        <div class="photo-card">
+          <img src="${p.src}" alt="" />
+          <input type="text" data-i="${i}" placeholder="Caption\u2026" value="${escapeAttr(p.caption || '')}" />
+          ${controls(i)}
+        </div>` : `
+        <div class="photo-card" style="border-style:dashed;">
+          <div style="height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;color:var(--warn);background:var(--warn-bg);">
+            <span style="font-size:12px;font-weight:700;">Re-attach</span>
+            <span style="font-size:11.5px;color:var(--muted);word-break:break-all;">${escapeAttr(p.name || '(photo)')}</span>
+            <label class="addbtn" style="padding:4px 8px;font-size:11.5px;" for="reattach_${i}">Choose image</label>
+            <input id="reattach_${i}" type="file" accept="image/*" data-reattach="${i}" hidden />
+          </div>
+          <input type="text" data-i="${i}" placeholder="Caption\u2026" value="${escapeAttr(p.caption || '')}" />
+          ${controls(i)}
+        </div>`).join('');
+      host.querySelectorAll('input[data-reattach]').forEach((el) => {
+        el.addEventListener('change', async (ev) => {
+          const idx = Number(el.dataset.reattach);
+          const file = (ev.target.files || [])[0];
+          ev.target.value = '';
+          if (!file) return;
+          try {
+            const src = await downscaleImage(file);
+            evidence.photos[idx].src = src;                 // caption + order preserved; only bytes restored
+            if (!evidence.photos[idx].name) evidence.photos[idx].name = String(file.name || '');
+            saveEvidence(); renderPhotos(); onEdit(0);
+          } catch (err) {
+            const warn = document.getElementById('photoWarn');
+            warn.textContent = err && err.message ? err.message : 'That image could not be added.';
+            warn.classList.add('show');
+          }
+        });
+      });
+      host.querySelectorAll('input[data-i]').forEach((el) => {
+        el.addEventListener('input', () => {
+          evidence.photos[Number(el.dataset.i)].caption = el.value;
+          saveEvidence();                       // persists immediately; focus is never touched
+          onEdit(700);                // the report follows the caption, automatically
+        });
+      });
+      host.querySelectorAll('button[data-remove]').forEach((b) => {
+        b.addEventListener('click', () => {
+          evidence.photos.splice(Number(b.dataset.remove), 1);
+          saveEvidence(); renderPhotos(); onEdit(0);
+        });
+      });
+      host.querySelectorAll('button[data-up]').forEach((b) => {
+        b.addEventListener('click', () => movePhoto(Number(b.dataset.up), -1));
+      });
+      host.querySelectorAll('button[data-down]').forEach((b) => {
+        b.addEventListener('click', () => movePhoto(Number(b.dataset.down), +1));
+      });
+    }
+
+    function renderAttachments() {
+      const host = document.getElementById('attachList');
+      host.innerHTML = evidence.attachments.map((a, i) => `
+        <div class="att-row">
+          <input type="text" data-a="${i}" value="${escapeAttr(a.label || '')}" placeholder="Document name" />
+          <label><input type="checkbox" data-inc="${i}" ${a.included ? 'checked' : ''} /> include</label>
+          <button type="button" data-del="${i}">Remove</button>
+        </div>`).join('');
+      host.querySelectorAll('input[data-a]').forEach((el) => {
+        el.addEventListener('input', () => {
+          evidence.attachments[Number(el.dataset.a)].label = el.value;
+          saveEvidence(); onEdit(700);
+        });
+      });
+      host.querySelectorAll('input[data-inc]').forEach((el) => {
+        el.addEventListener('change', () => {
+          evidence.attachments[Number(el.dataset.inc)].included = el.checked;
+          saveEvidence(); onEdit(0);
+        });
+      });
+      host.querySelectorAll('button[data-del]').forEach((b) => {
+        b.addEventListener('click', () => {
+          evidence.attachments.splice(Number(b.dataset.del), 1);
+          saveEvidence(); renderAttachments(); onEdit(0);
+        });
+      });
+    }
+
+    const escapeAttr = (v) => String(v ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    document.getElementById('photoInput').addEventListener('change', async (ev) => {
+      const files = Array.from(ev.target.files || []);
+      ev.target.value = '';                                   // allow re-picking the same file
+      for (const file of files) {
+        try {
+          const src = await downscaleImage(file);
+          evidence.photos.push({ id: 'p' + Date.now() + '_' + evidence.photos.length, src,
+                                 name: String(file.name || ''), caption: '' });
+          if (!saveEvidence()) break;                         // quota hit — stop, message already shown
+        } catch (err) {
+          const warn = document.getElementById('photoWarn');
+          warn.textContent = err && err.message ? err.message : 'That image could not be added.';
+          warn.classList.add('show');
+        }
+      }
+      renderPhotos();
+      onEdit(0);            // a photo added is a photo IN the report — no click required
+    });
+
+    document.getElementById('addAttachBtn').addEventListener('click', () => {
+      evidence.attachments.push({ label: '', included: true });
+      saveEvidence(); renderAttachments();
+      const inputs = document.querySelectorAll('#attachList input[data-a]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    });
+
+    rebuildBtn.addEventListener('click', () => { buildReport(); });   // re-render with the current evidence
+
+    // ===================== SAVE THE WHOLE CLAIM TO A FILE =====================
+    // A finished claim lives entirely in sessionStorage and is gone when the tab closes. This writes
+    // the WHOLE claim state to a .wsclaim file so it can be reopened and the report reproduced exactly.
+    // Photos are saved BY REFERENCE (name + caption, never the image bytes - Joseph's decision); the
+    // images live in the claim folder beside the file and are re-attached on load. Branding (logo /
+    // "Prepared by") is per-device localStorage and is deliberately NOT written here - a claim handed
+    // to a colleague must never carry another company's branding.
+    const CLAIM_FILE_FORMAT = 'woodshake-claim';
+    const CLAIM_FILE_VERSION = 'v81';                 // MUST match the version constant in index.html
+    const CLAIM_PREFIX = 'woodShakeWorkbench.';
+    const CLAIM_KEYS = ['claimState', 'page2Payload', 'page2Selection',
+                        'page2Restore', 'carrierConfirmation', 'reportEvidence'];
+
+    function serializeClaim() {
+      const state = {};
+      for (const k of CLAIM_KEYS) {
+        const raw = sessionStorage.getItem(CLAIM_PREFIX + k);
+        if (raw == null) continue;
+        let val;
+        try { val = JSON.parse(raw); } catch (_e) { continue; }
+        if (k === 'reportEvidence' && val && Array.isArray(val.photos)) {
+          val = Object.assign({}, val, {
+            photos: val.photos.map((p) => ({ name: String(p.name || ''), caption: String(p.caption || '') }))
+          });
+        }
+        state[k] = val;
+      }
+      return { format: CLAIM_FILE_FORMAT, version: CLAIM_FILE_VERSION,
+               savedAt: new Date().toISOString(), state };
+    }
+
+    function claimFileName() {
+      const conf = readJson('woodShakeWorkbench.carrierConfirmation');
+      const vci = (conf && conf.vci) || {};
+      const base = (vci.claim_number || vci.insured || 'wood_shake_claim');
+      const slug = String(base).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'wood_shake_claim';
+      const day = new Date().toISOString().slice(0, 10);
+      return `${slug}_${day}.wsclaim`;
+    }
+
+    document.getElementById('saveClaimBtn').addEventListener('click', () => {
+      const claim = readJson('woodShakeWorkbench.claimState');
+      if (!claim || !claim.uiSelection) {
+        showError('There is no confirmed claim in this session to save. Build the scope first.');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(serializeClaim(), null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = claimFileName();
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    // A claim loaded from a file arrives with a one-shot notice: whether it was saved by a different
+    // version, and which photos still need re-attaching. Both belong ON SCREEN, never in the report.
+    function showClaimLoadNotice() {
+      const box = document.getElementById('claimLoadNotice');
+      let notice = null;
+      try { notice = JSON.parse(sessionStorage.getItem('woodShakeWorkbench.loadNotice') || 'null'); }
+      catch (_e) { notice = null; }
+      sessionStorage.removeItem('woodShakeWorkbench.loadNotice');   // one-shot; never re-saved into a claim
+      if (!notice) return;
+      const parts = [];
+      if (notice.versionMismatch) {
+        parts.push('This claim was saved by ' + (notice.fromVersion || 'an earlier version')
+          + ', and you are running ' + (notice.runningVersion || CLAIM_FILE_VERSION)
+          + '. Corrections since then may legitimately change a number - this is expected, not an error.');
+      }
+      const pending = Array.isArray(notice.photosPending) ? notice.photosPending : [];
+      if (pending.length) {
+        parts.push(pending.length + ' photo' + (pending.length === 1 ? '' : 's')
+          + ' must be re-attached before Section 6 is complete: ' + pending.join(', ')
+          + '. Add them under Photos below - captions and order are already restored.');
+      }
+      if (!parts.length) return;
+      box.innerHTML = parts.map((t) => '<div>' + escapeAttr(t) + '</div>').join('');
+      box.classList.add('show');
+    }
+
+    async function buildReport() {
+      const claim = readJson('woodShakeWorkbench.claimState');
+      if (!claim || !claim.xmlText || !claim.uiSelection) {
+        showError('No confirmed scope found in this session. Start from Page 1 and confirm a selection on Page 2.');
+        return;
+      }
+
+      // Carrier-absent path: page 2 routes straight here when no estimate was attached, so there is
+      // no page-3 confirmation. With no rows, Module 3 renders in REQUIRED_SCOPE_ONLY mode.
+      const confirmation = readJson('woodShakeWorkbench.carrierConfirmation');
+      // PAGE 3 IS THE ONLY PLACE CLAIM INFORMATION IS EVER COLLECTED, and it ALWAYS runs now. If its
+      // state is missing, the user got here some other way — say so and send them back. NEVER
+      // fabricate an all-blank header that asserts confirmed: true. That is a lie in a document an
+      // adjuster and an appraiser read.
+      if (!confirmation || !confirmation.vci) {
+        showError('The claim details have not been confirmed yet. Go back to the claim page and '
+          + 'complete them — the report cannot be written without them.');
+        backBtn.setAttribute('href', './page3.html');
+        return;
+      }
+
+      const rows = (confirmation.rows || []);
+      const vci = confirmation.vci;
+      backBtn.setAttribute('href', './page3.html');
+
+      // v87: THE MODE IS PAGE 3'S AUTHORITY. Page 4 acts on the carried mode; it does NOT re-derive it
+      // from the in-scope row count — that was the bug that turned an estimate with zero roof lines into
+      // a repair-scope report. Three states that used to collapse into one:
+      const mode = confirmation.mode;                       // 'comparison' | 'repair-scope' | undefined (pre-v87 claim)
+      const estimateAttached = Boolean(confirmation.estimateAttached);
+      const parseStatus = confirmation.parseStatus || '';
+      const carrierLineCount = Number(confirmation.carrierLineCount || 0);
+
+      // (iii) an estimate was attached but nothing could be read from it, and no lines were entered to
+      // make up for it. The tool does not know what the carrier wrote, so it MUST NOT assert they scoped
+      // nothing — BLOCK with a clear message instead of emitting a report that claims they scoped zero.
+      if (estimateAttached && parseStatus === 'TEXT_LAYER_ABSENT' && carrierLineCount === 0) {
+        showError('The attached estimate could not be read \u2014 it looks like a scan or has no text layer \u2014 '
+          + 'and no carrier lines were entered. The report cannot say what the carrier did or did not scope, so '
+          + 'it will not be written. Go back and either re-attach a text-based PDF, type the carrier lines in by '
+          + 'hand, or \u2014 only if there is genuinely no carrier estimate \u2014 start without one for a '
+          + 'repair-scope report.');
+        backBtn.setAttribute('href', './page3.html');
+        return;
+      }
+
+      // (i) repair-scope vs (ii) comparison — decided by the carried mode, the single authority. A
+      // pre-v87 claim has no stored mode; fall back to the old row-count behaviour so it still renders.
+      const comparisonIntended = (mode === 'comparison') || (mode == null && rows.length > 0);
+
+      try {
+        await ready();
+        statusText.textContent = 'Running the scope comparison and building the report…';
+        const result = await buildModule3Report(claim.xmlText, claim.uiSelection, rows, vci, {
+          // The user's own evidence — never a hardcoded list.
+          attachments: evidence.attachments
+            .filter((a) => a.included && String(a.label || '').trim())
+            .map((a) => ({ label: String(a.label).trim(), source: 'user', included: true })),
+          // Only photos whose bytes are present reach §6. A loaded claim's not-yet-re-attached photos
+          // are held out here and flagged on screen (never in the report) so §6 is never silently wrong.
+          photos: evidence.photos.filter((p) => p.src).map((p) => ({ src: p.src, caption: String(p.caption || '') })),
+          reference_tags: ['CSSB', 'IRC R905.8'],
+          claim_name: 'Wood Shake Repair' + (vci.insured ? ' — ' + vci.insured : ''),
+          // v87: carry page 3's mode so the engine builds a COMPARISON even when there are no in-scope
+          // roof rows (every required item missing) — the strongest case, not a repair-scope degrade.
+          comparison_intended: comparisonIntended
+        });
+
+        modePill.textContent = result.mode === 'COMPARISON' ? 'Comparison' : 'Required scope only';
+        const bits = [];
+        if (result.mode === 'COMPARISON') {
+          const divergent = (result.lines || []).filter(l => l.operation_match === false).length;
+          bits.push((result.lines || []).length + ' compared lines');
+          if (divergent) bits.push(divergent + ' with an operation difference');
+        } else {
+          bits.push('No carrier estimate — required scope only, no comparison sections.');
+        }
+        statusText.textContent = bits.join(' · ');
+
+        if (result.language_gate_hard && result.language_gate_hard.length) {
+          warnNotice.textContent = 'The language guard blocked export: '
+            + result.language_gate_hard.map(h => h.term || h).join(', ');
+          warnNotice.classList.add('show');
+        }
+        if (!result.exported || !result.html) {
+          showError('The engine did not export a report (language gate or render gate). Nothing is shown rather than showing something unverified.');
+          return;
+        }
+
+        reportHtml = result.html;
+        reportStale = false;                       // the preview now matches the evidence
+        updateModeUi();
+        frame.srcdoc = reportHtml;                 // isolate the report's own CSS from this shell
+        frame.style.display = 'block';
+        loadingBox.style.display = 'none';
+        printBtn.disabled = false;
+        downloadBtn.disabled = false;
+      } catch (err) {
+        showError('Could not build the report: ' + (err && err.message ? err.message : String(err)));
+      }
+    }
+
+    // Fit the iframe to its content so the report scrolls with the page (mobile-friendly).
+    frame.addEventListener('load', () => {
+      try {
+        const doc = frame.contentDocument;
+        if (doc && doc.body) {
+          const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+          if (h > 0) frame.style.height = (h + 24) + 'px';
+        }
+      } catch (_e) { /* keep the min-height fallback */ }
+      // A reorder resizes the iframe above the list; put the viewport back where the move left it so a
+      // move never throws the page. Scoped to moves — other renders leave scroll alone.
+      if (_pendingScroll) { window.scrollTo(_pendingScroll.x, _pendingScroll.y); _pendingScroll = null; }
+    });
+
+    // CORRECTNESS OVER ERGONOMICS: a print or save must NEVER emit a report that is behind the edits.
+    // If the preview is stale (manual mode, un-rebuilt edits), rebuild FIRST — and, for print, wait for the
+    // iframe to actually show the rebuilt report — then emit. If the rebuild fails, emit NOTHING rather than
+    // a stale document. This is the one place the toggle's ergonomics give way to being honest on paper.
+    async function ensureFreshForEmit() {
+      if (!reportStale) return true;
+      const loaded = new Promise((res) => frame.addEventListener('load', res, { once: true }));
+      await buildReport();
+      if (reportStale) return false;                 // build failed — do not emit a stale report
+      await Promise.race([loaded, new Promise((r) => setTimeout(r, 2000))]);
+      return true;
+    }
+
+    printBtn.addEventListener('click', async () => {
+      if (!(await ensureFreshForEmit())) return;
+      if (!reportHtml) return;
+      const win = frame.contentWindow;
+      if (win) { win.focus(); win.print(); }         // prints the REPORT, not the page shell
+    });
+
+    downloadBtn.addEventListener('click', async () => {
+      if (!(await ensureFreshForEmit())) return;
+      if (!reportHtml) return;
+      const blob = new Blob([reportHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wood_shake_repair_report.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    liveModeButton.addEventListener('click', () => setLiveMode(true));
+    manualModeButton.addEventListener('click', () => setLiveMode(false));
+
+    updateModeUi();      // reflect the persisted mode (default: Manual) before the first build
+    loadEvidence();      // photos, captions and attachments survive leaving page 4 and coming back
+    showClaimLoadNotice();   // version + re-attach banners for a claim just loaded from a file
+    renderPhotos();
+    renderAttachments();
+    buildReport();
+  </script>
+</body>
+</html>

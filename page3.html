@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confirm carrier estimate — Wood Shake Workbench</title>
+  <style>
+    :root {
+      --ink: #1f2733; --muted: #5b6573; --line: #d8dfeb; --accent: #33485e;
+      --bg: #eef1f4; --ok: #1f7a4d; --ok-bg: #e8f5ee; --off: #8a94a3; --warn: #a8710f;
+      --warn-bg: #fdf3e0; --card: #fff; --err: #a3282b;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45;
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 16px 14px 100px; }
+    header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    h1 { font-size: 19px; margin: 0; }
+    .step { font-size: 12px; color: var(--muted); }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px; margin-bottom: 14px; }
+    .panel h2 { font-size: 15px; margin: 0 0 3px; }
+    .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+
+    .banner { border-radius: 10px; padding: 11px 13px; font-size: 13px; margin-bottom: 12px; display: none; }
+    .banner.show { display: block; }
+    .banner.info { background: #eaf1f8; border: 1px solid #bcd2e6; color: #2b4a68; }
+    .banner.warn { background: var(--warn-bg); border: 1px solid #e6c98a; color: var(--warn); }
+    .banner ul { margin: 6px 0 0; padding-left: 18px; }
+
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.wide { grid-column: 1 / -1; }
+    .field label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+    .field input { font: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fbfcfe; color: var(--ink); min-width: 0; }
+    .field input.missing { border-color: #e0a8a8; background: #fdf6f6; }
+    .field .req { color: var(--err); }
+
+    .line { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; background: var(--card); }
+    .line.out { background: #f7f8fa; }
+    .line.needs { border-color: #e6c98a; background: var(--warn-bg); }
+    .line.dismissed { opacity: .62; border-style: dashed; }
+    .line-head { display: flex; align-items: flex-start; gap: 10px; }
+    .line-main { flex: 1; min-width: 0; }
+    .line-desc { font-size: 14px; font-weight: 600; }
+    .line.out .line-desc { color: var(--muted); font-weight: 500; }
+    .line-meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .cat { display: inline-block; margin-top: 6px; font-size: 12.5px; padding: 3px 8px; border-radius: 999px;
+      background: #eef2f8; color: var(--accent); font-weight: 600; }
+    .cat.none { background: #f0f1f3; color: var(--off); font-weight: 500; }
+    .pairnote { font-size: 12px; color: var(--muted); margin-top: 5px; font-style: italic; }
+    .rowacts { display: flex; gap: 6px; margin-top: 8px; }
+    .rowacts button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 7px;
+      border: 1px solid var(--line); background: #f4f6f9; color: var(--muted); cursor: pointer; }
+    .rowacts button.del:hover { border-color: #e0a8a8; color: var(--err); }
+
+    .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
+      background: #f2f4f7; flex: none; }
+    .toggle button { font: inherit; font-size: 12px; font-weight: 600; padding: 7px 11px; border: 0;
+      background: transparent; color: var(--muted); cursor: pointer; }
+    .toggle button.on { background: var(--ok-bg); color: var(--ok); }
+    .toggle button.on.off-state { background: #e9ecf1; color: var(--ink); }
+    /* v67: a Layer-A proposal shown as a proposal, not a firm decision (dashed until the user asserts it) */
+    .toggle button.on.proposed { background: repeating-linear-gradient(45deg,#eef1f5,#eef1f5 4px,#e3e8ee 4px,#e3e8ee 8px);
+      color: var(--ink); font-style: italic; }
+    .batchbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0 2px; }
+    .batch-label { font-size: 12.5px; color: var(--muted); }
+    .batchbtn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--soft); color: var(--ink); }
+    .batchbtn:hover { border-color: var(--accent); }
+
+    .editbox { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+    .editbox.flagged { border-top-color: #e2d3ae; }
+    .editgrid { display: grid; grid-template-columns: 1fr 90px 80px; gap: 8px; }
+    .editgrid .full { grid-column: 1 / -1; }
+    .editbox input, .editbox select { font: inherit; font-size: 14px; padding: 9px 10px; width: 100%;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .flagmsg { font-size: 12px; font-weight: 700; color: var(--warn); margin-bottom: 6px; }
+    .editacts { display: flex; gap: 8px; margin-top: 8px; }
+
+    .addbtn { width: 100%; padding: 12px; border: 1px dashed #b6c2d2; border-radius: 10px; background: #f6f9fc;
+      color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+    .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 18px 8px; }
+
+    .ack { display: flex; gap: 9px; align-items: flex-start; padding: 11px 13px; margin-bottom: 10px;
+      border: 1px solid #bcd2e6; background: #eaf1f8; border-radius: 10px; font-size: 13px;
+      color: #2b4a68; cursor: pointer; line-height: 1.45; }
+    .ack.done { border-color: #a8d5bd; background: #e8f5ee; color: #1f7a4d; }
+    .ack.disabled { opacity: .55; cursor: not-allowed; }
+    .ack input { margin-top: 2px; flex: none; }
+    .field label .req { color: var(--err); }
+    .field input.missing { border-color: #e0a8a8; background: #fdf6f6; }
+    .summary { font-size: 13px; color: var(--muted); margin: 10px 2px 0; }
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.96);
+      border-top: 1px solid var(--line); padding: 10px 14px; display: flex; gap: 10px;
+      align-items: center; justify-content: space-between; }
+    .bar .count { font-size: 12.5px; color: var(--muted); }
+    .btn { font: inherit; font-size: 14px; font-weight: 600; padding: 11px 18px; border-radius: 10px;
+      border: 1px solid var(--line); background: #eef2f8; color: var(--ink); text-decoration: none;
+      cursor: pointer; display: inline-flex; align-items: center; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.small { padding: 7px 12px; font-size: 13px; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .blockmsg { font-size: 13px; color: var(--warn); background: var(--warn-bg); border: 1px solid #e6c98a;
+      border-radius: 8px; padding: 9px 11px; margin-bottom: 10px; display: none; }
+    .blockmsg.show { display: block; }
+    @media (max-width: 520px) { .fields, .editgrid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <h1>Confirm the carrier estimate</h1>
+      <span class="step">Step 3 of 4</span>
+    </header>
+
+    <div class="banner" id="parseBanner"></div>
+    <!-- Shown ONLY when the estimate names more than one structure. -->
+    <div class="banner" id="structureBanner"></div>
+
+    <section class="panel">
+      <h2>Claim information</h2>
+      <p class="hint" id="claimHint">Read from the estimate. Fix anything that's wrong.</p>
+      <div class="fields" id="claimFields"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Carrier lines</h2>
+      <p class="hint">One decision per line: is it part of the roof repair we're comparing? You can edit or delete any line, and add lines we missed.</p>
+      <label class="ack" id="ackBox">
+        <input type="checkbox" id="noComparison" />
+        <span><strong>No carrier comparison needed &mdash; this is a repair-scope report.</strong>
+          Tick this if there is no carrier estimate to compare against: a pure repair calculation, or a
+          claim whose estimate has not arrived yet. The report will show the required scope only.</span>
+      </label>
+      <div class="blockmsg" id="blockMsg"></div>
+      <div class="mixedop-notice" id="mixedOpNotice" style="display:none;"></div>
+      <div id="lineList"></div>
+      <div class="batchbar" id="batchBar" style="display:none">
+        <span class="batch-label">Set the remaining undecided lines:</span>
+        <button class="batchbtn" id="batchExterior" type="button">Mark all remaining as exterior</button>
+        <button class="batchbtn" id="batchInterior" type="button">Mark all remaining as interior</button>
+      </div>
+      <button class="addbtn" id="addLineBtn" type="button">+ Add line item</button>
+      <p class="summary" id="scopeSummary"></p>
+    </section>
+  </div>
+
+  <div class="bar">
+    <a class="btn" href="./page2.html">← Scope</a>
+    <span class="count" id="barCount"></span>
+    <button class="btn primary" id="continueBtn" type="button">Continue to report →</button>
+  </div>
+
+  <script type="module">
+    // PAGE 3 = CONFIRMATION ONLY, now driven by LAYER A (the real uploaded estimate) instead of a
+    // hardcoded fixture. Three states, ONE screen shape:
+    //   FULL PARSE   -> header + rows prefilled; user confirms.
+    //   PARTIAL      -> what was read is prefilled; gaps flagged; user fills them.
+    //   NO TEXT LAYER-> plain notice, blank (labeled) header, empty line list; user adds lines.
+    // Add / Edit / Delete are available in ALL THREE states. No dollar amounts are displayed.
+
+    // v74.2 FIX — NAMED imports throw and kill the ENTIRE page-3 script if the bridge does not export
+    // exactly these names (e.g. a stale/partial pyodide_bridge.js without the v73 additions). That is
+    // what left page 3 as dead static HTML — no claim fields, the add button opening no form, the
+    // checkbox doing nothing — because none of the wiring below ever ran. Manual entry is pure JS and
+    // must NEVER depend on the engine bridge's shape. Import the namespace (never throws on a missing
+    // member) and fall back: op derivation -> null (uses R&R), unit list -> the built-in list.
+    import * as bridge from './pyodide_bridge.js';
+    const ready = bridge.ready || (async () => { throw new Error('engine unavailable'); });
+    const parseCarrierEstimate = bridge.parseCarrierEstimate
+      || (async () => ({ status: 'TEXT_LAYER_ABSENT', lines: [], notes: [], claim_header: {} }));
+    const proposeOperation = bridge.proposeOperation || (async () => null);
+    const carrierUnitList = bridge.carrierUnitList || (async () => null);
+    // v75: flag categories the engine will split into more than one operation (Detach & Reset + new
+    // material). Resilient import: a stale bridge without it simply shows no notice, never breaks page 3.
+    const mixedOperationCategories = bridge.mixedOperationCategories || (async () => []);
+
+    // 29 ids since POWER_VENT landed; the name is historical and page-local (mirrors
+    // shared_category_registry, which is the authority and hash-locks the list).
+    // v74: matches shared_category_registry.REGISTRY (33 ids). The four new ids are receive-only
+    // categories a user can also map a line to by hand, so the picker must offer them.
+    const REGISTRY_28 = ['APPURT_IWS','BOX_VENT','CHIMNEY_CHASE_COVER','CHIMNEY_FLASH','DEBRIS_DISPOSAL',
+      'DRIP_EDGE','ENDWALL_FLASH','EQUIPMENT','FIELD_COVERING','FIELD_FELT','FIELD_TEAROFF','FLUE_CAP',
+      'GABLE_CORNICE','GENERAL_LABOR','HIGH_SLOPE_CHARGE','HIP_CAPS','IWS','PIPE_JACK_FLASH','POWER_VENT',
+      'RIDGE_CAPS','RIDGE_HIP_CAP','RIDGE_VENT','ROOFER_LABOR','SHAKE_FIELD_RR','SKYLIGHT_FLASH','STARTER',
+      'STEEP_CHARGE','STEP_FLASH','TRANSITION_FLASH','TURBINE_VENT','UNMAPPED','VALLEY_METAL','VENT_CAP'];
+    const CAT_LABEL = {
+      SHAKE_FIELD_RR:'Wood shake field', VALLEY_METAL:'Valley metal', PIPE_JACK_FLASH:'Pipe jack flashing',
+      GENERAL_LABOR:'General labor', CHIMNEY_FLASH:'Chimney flashing', STEP_FLASH:'Step flashing',
+      ENDWALL_FLASH:'Endwall flashing', TRANSITION_FLASH:'Transition flashing', SKYLIGHT_FLASH:'Skylight flashing',
+      RIDGE_CAPS:'Ridge caps', HIP_CAPS:'Hip caps', RIDGE_HIP_CAP:'Ridge/hip cap', RIDGE_VENT:'Ridge vent',
+      DRIP_EDGE:'Drip edge', STARTER:'Starter course', IWS:'Ice & water shield', APPURT_IWS:'Appurtenance IWS',
+      FIELD_FELT:'Field felt', FIELD_TEAROFF:'Field tear-off', FIELD_COVERING:'Field covering',
+      BOX_VENT:'Box vent', TURBINE_VENT:'Turbine vent', VENT_CAP:'Vent cap',
+      // Kept DISTINCT from VENT_CAP on purpose: carriers list "R&R Roof mount power attic vent"
+      // separately from "Exhaust cap - through roof", so the picker must be able to say which.
+      POWER_VENT:'Power attic vent',
+      CHIMNEY_CHASE_COVER:'Chimney chase cover', GABLE_CORNICE:'Gable cornice',
+      STEEP_CHARGE:'Steep charge', HIGH_SLOPE_CHARGE:'High slope charge',
+      // v74 — four receive-only carrier categories.
+      DEBRIS_DISPOSAL:'Debris disposal / haul-off', ROOFER_LABOR:'Roofer labor',
+      EQUIPMENT:'Equipment (ladders, staging, lifts)', FLUE_CAP:'Flue cap',
+      UNMAPPED:'Unmapped'
+    };
+    const catLabel = (id) => CAT_LABEL[id] || id;
+    // v73 DEFECT 2: DERIVED from the parser's _UNITS via the bridge on load (see initializePage), so
+    // the dropdown and the parser cannot drift. This literal is only a pre-load fallback and is
+    // overwritten with the authoritative list; it is never the source of truth.
+    let UNITS = ['SQ','LF','SF','EA','HR','DA','WK','MO','CY','GL','RL','BF','BX','PR'];
+
+    // [key, label, wideCell]
+    const CLAIM_FIELDS = [
+      ['job_name','Job / insured name'], ['loss_address','Property address', true],
+      ['claim_number','Claim #'], ['policy_number','Policy #'],
+      ['carrier','Carrier'], ['price_list','Price list'],
+      ['type_of_loss','Type of loss'], ['date_of_loss','Date of loss'],
+      ['deductible','Deductible']
+    ];
+    const FIELD_LABEL = Object.fromEntries(CLAIM_FIELDS.map(([k, label]) => [k, label]));
+
+    // THE REQUIRED SET FOLLOWS THE MODE. This tool must also serve a PURE REPAIR CALCULATION — a
+    // contractor scoping a job with no claim, no carrier, no insurance at all. Such a job has no date
+    // of loss, no claim number, no carrier and no policy; demanding them would block a legitimate and
+    // common use. So:
+    //   COMPARISON  (in-scope carrier lines exist)  -> the claim must be IDENTIFIABLE: you are arguing
+    //                                                   with an adjuster.
+    //   REPAIR-SCOPE ("no comparison needed" ticked) -> only WHERE and WHOSE. Everything else stays
+    //                                                   available but OPTIONAL — a user may well have a
+    //                                                   claim number and no estimate yet.
+    // §1 of the report already OMITS blank fields, so a repair-scope report simply shows the property
+    // and the name, with no empty insurance rows. No renderer special-casing needed.
+    const REQUIRED_COMPARISON  = ['job_name', 'loss_address', 'date_of_loss', 'carrier', 'claim_number'];
+    const REQUIRED_REPAIR_ONLY = ['job_name', 'loss_address'];
+    const requiredFields = () => (state.noComparison ? REQUIRED_REPAIR_ONLY : REQUIRED_COMPARISON);
+
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+    const state = {
+      claim: { job_name:'', loss_address:'', claim_number:'', policy_number:'', carrier:'',
+               price_list:'', type_of_loss:'', date_of_loss:'', deductible:'' },
+      rows: [], status: '', notes: [], editing: null, nextId: 1,
+      // THE EXPLICIT ASSERTION. The tool never assumes there is nothing to compare — the user says so.
+      // It does DOUBLE DUTY: "there is nothing to compare" AND "do not demand claim data this job does
+      // not have". It is MUTUALLY EXCLUSIVE with having in-scope lines.
+      noComparison: false,
+      estimateAttached: false,
+      // WHICH structure the EagleView XML represents. Null until asserted, and only ever
+      // ASKED FOR when more than one structure is detected.
+      roofStructure: null
+    };
+
+    function readClaimState() {
+      try { const raw = sessionStorage.getItem('woodShakeWorkbench.claimState'); return raw ? JSON.parse(raw) : null; }
+      catch (_e) { return null; }
+    }
+
+    // v68 CLAIM IDENTITY — a stored page-3 confirmation belongs to ONE claim. The identity is the
+    // carrier estimate text (what page 3 loads); a different claim has a different estimate, so its
+    // signature differs and a stale confirmation is discarded rather than leaked into the new claim.
+    // A cheap synchronous djb2 signature keeps this to page3.html — no bridge import for the XML.
+    function claimSignature() {
+      const claim = readClaimState();
+      const text = String((claim && claim.estimateText) || '');
+      let h = 5381;
+      for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+      return 'e' + (h >>> 0).toString(36) + ':' + text.length;
+    }
+
+    function sideFor(desc, cat) {
+      const d = String(desc || '').toLowerCase();
+      // v72 DEFECT 1: a material-only / labor-only line must reach the engine as that COMPOSITION, or
+      // infer_effective_operation reads the default 'RR' side and reports a full R&R match. These are
+      // checked before remove/install because "material only" carries neither verb.
+      if (/material[\s-]*only|\bmat\.?\s*only/.test(d)) return 'MATERIAL';
+      if (/labor[\s-]*only/.test(d)) return 'INSTALL';
+      if (/\bremove\b/.test(d) && !/\br&r\b|\breplace\b/.test(d)) return 'REMOVE';
+      if (/\binstall\b/.test(d) && !/\br&r\b/.test(d)) return 'INSTALL';
+      if (cat === 'GENERAL_LABOR') return 'LABOR';
+      return 'RR';
+    }
+
+    // v73 DEFECT 1: hand-entry operation. The dropdown offers "Auto" (derive from the description via
+    // the ONE authority, propose_operation, over the bridge) plus explicit overrides. No second
+    // derivation lives here — page 3 only calls the parser's function and lets the user override.
+    const OPS = [
+      ['R_AND_R', 'R&R'], ['MATERIAL_ONLY', 'Material only'], ['INSTALL_ONLY', 'Labor / install only'],
+      ['DETACH_RESET', 'Detach & reset'], ['REMOVE', 'Remove'], ['REPLACE', 'Replace'],
+    ];
+    const OP_LABEL = Object.fromEntries(OPS);
+
+    async function deriveOp(desc, category) {
+      // ONE authority: the parser's propose_operation, reached over the bridge. But the SAVE must
+      // never hang on it — if the engine is slow or stuck loading, fall back after a short wait so a
+      // hand-keyed line always commits (the user can still override the operation in the row). This is
+      // why a text-less estimate — where the engine may still be loading — could not add a line.
+      const fallback = (category === 'GENERAL_LABOR' ? 'LABOR' : 'R&R');
+      try {
+        const op = await Promise.race([
+          proposeOperation(desc),
+          new Promise((res) => setTimeout(() => res(undefined), 1500)),
+        ]);
+        return op || fallback;
+      } catch (e) { return fallback; }
+    }
+
+    // The engine reads the operation from the source-line COMPOSITION first, so an explicit override
+    // must set a matching side or infer_effective_operation would ignore it and report R&R.
+    function sideForOp(op, desc, category) {
+      switch (op) {
+        case 'MATERIAL_ONLY': return 'MATERIAL';
+        case 'INSTALL_ONLY':  return 'INSTALL';
+        case 'REMOVE':        return 'REMOVE';
+        case 'REPLACE':       return 'INSTALL';
+        case 'LABOR':         return 'LABOR';
+        default:              return sideFor(desc, category);   // R&R / D&R -> desc-driven pairing
+      }
+    }
+
+    // v73 DEFECT 2: replace the fallback UNITS with the parser's authoritative list, then re-render so
+    // any hand-entry dropdown already open picks up the full set (WK, MO, BF, BX, PR).
+    async function loadUnitList() {
+      try {
+        const list = await carrierUnitList();
+        if (Array.isArray(list) && list.length) { UNITS = list; renderRows(); }
+      } catch (e) { /* keep the fallback list */ }
+    }
+
+    // Layer A line -> display row. A Remove line and its partner on the SAME category+structure+unit
+    // collapse into ONE row (Detach & Reset per the operation dimension) so the user never resolves a
+    // duplicate. This is CATEGORY-AGNOSTIC (shakes, steep, high-slope, any category) and does NOT
+    // depend on an 'install' verb: the real Xactimate partner is the same description with 'Remove '
+    // stripped and carries no verb, so the partner is simply the non-REMOVE member of the group.
+    // The ENGINE is the authority and will not sum a pair even if two rows reach it; this is UX.
+    function rowsFromLayerA(lines) {
+      const rows = [];
+      const keyOf = l => [l.suggested_category || '', l.suggested_structure_id || '', l.unit || ''].join('|');
+      const groups = new Map();
+      for (const l of lines) {
+        const k = keyOf(l);
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(l);
+      }
+
+      // v76 DEFECT 1: a PAIR is ONE Remove and EXACTLY ONE partner. A THIRD line in the same group is a
+      // DIFFERENT OPERATION and stays its own row — never silently dropped. Remove + Install (put-back)
+      // reads as ONE Detach & Reset; Remove + a single bare partner reads as R&R (v60). Anything else
+      // (a bare line beside a Remove+Install pair, two genuine runs, labor) is emitted line-by-line so
+      // the engine sees every operation and can partition them.
+      const consumed = new Set();     // line objects folded into a pair
+      const foldByKey = new Map();    // key -> {remove, partner, op}
+      for (const [k, grp] of groups) {
+        const cat = grp[0].suggested_category || '';
+        if (!cat || cat === 'GENERAL_LABOR') continue;
+        const removes  = grp.filter(x => sideFor(x.description, cat) === 'REMOVE');
+        const installs = grp.filter(x => sideFor(x.description, cat) === 'INSTALL');
+        const rest     = grp.filter(x => { const s = sideFor(x.description, cat); return s !== 'REMOVE' && s !== 'INSTALL'; });
+        if (removes.length === 1 && installs.length === 1) {
+          foldByKey.set(k, { remove: removes[0], partner: installs[0], op: 'DETACH_RESET' });
+          consumed.add(removes[0]); consumed.add(installs[0]);
+        } else if (removes.length === 1 && installs.length === 0 && rest.length === 1) {
+          foldByKey.set(k, { remove: removes[0], partner: rest[0], op: 'R&R' });
+          consumed.add(removes[0]); consumed.add(rest[0]);
+        }
+      }
+
+      const foldEmitted = new Set();
+      for (const l of lines) {
+        const cat = l.suggested_category || '';
+        const k = keyOf(l);
+        const fold = foldByKey.get(k);
+        if (fold && consumed.has(l)) {
+          if (foldEmitted.has(k)) continue;    // emit the pair ONCE, at its first member's position
+          foldEmitted.add(k);
+          const keep = fold.partner;           // the Replace/Install side is authoritative (waste-included)
+          const isDR = fold.op === 'DETACH_RESET';
+          rows.push({
+            id: 'r' + (state.nextId++), label: [fold.remove.n, fold.partner.n].join(' + '),
+            desc: (keep.description || '').replace(/^(remove|install)\s+/i, ''),
+            qty: keep.qty, unit: keep.unit, category: cat,
+            disposition: 'in_scope', disposition_asserted: false,
+            in_scope: true, needs_mapping: false,
+            // v76 DEFECT 1: the folded Remove+Install is a DETACH & RESET, not the literal 'R&R'.
+            op: isDR ? 'DETACH_RESET' : 'R&R',
+            structure: keep.suggested_structure_id || null,
+            pair_note: isDR
+              ? 'Remove + Install read as one carrier operation (Detach & Reset).'
+              : 'Remove + Replace read as one carrier operation (Remove & Replace).',
+            source_lines: [
+              { side: sideFor(fold.remove.description, cat), qty: Number(fold.remove.qty) },
+              { side: sideFor(fold.partner.description, cat), qty: Number(fold.partner.qty) },
+            ]
+          });
+          continue;
+        }
+        if (consumed.has(l)) continue;         // a folded member that is not the emit position
+
+        const disp = l.suggested_disposition || (cat ? 'in_scope' : (l.needs_mapping ? 'undecided' : 'exterior'));
+        rows.push({
+          id: 'r' + (state.nextId++), label: String(l.n),
+          desc: l.description, qty: l.qty, unit: l.unit, category: cat,
+          // v67: Layer A PROPOSES a disposition (in_scope / exterior / interior / undecided). It is a
+          // proposal, not a decision — disposition_asserted stays false until the user (or batch) sets
+          // it. Nothing is ever silently dismissed: an unrecognised line proposes 'undecided' and BLOCKS.
+          disposition: disp, disposition_asserted: false,
+          in_scope: disp === 'in_scope', needs_mapping: Boolean(l.needs_mapping),
+          // v72 DEFECT 1 / v76 DEFECT 2: carry the carrier's DERIVED activity (material-only, labor-only,
+          // detach & reset, and now REPLACE for a bare material line). Fall back only when Layer A read no
+          // activity at all.
+          op: l.suggested_operation || (cat === 'GENERAL_LABOR' ? 'LABOR' : 'R&R'),
+          structure: l.suggested_structure_id || null,
+          source_lines: [{ side: sideFor(l.description, cat), qty: Number(l.qty) }]
+        });
+      }
+      return rows;
+    }
+
+    // ---- STRUCTURE: THE TOOL PROPOSES, THE HUMAN ASSERTS -----------------------------------
+    // This tool computes ONE roof from ONE EagleView XML. If the estimate also covers a detached
+    // garage, those lines have an APPROVED side and NO REQUIRED side — comparing them would have the
+    // tool asserting a gap it cannot justify, the exact failure avoided everywhere else (non-roof
+    // items stay out of the registry). So the roof structure must be NAMED, and only when there is
+    // genuinely something to choose.
+    const DEFAULT_STRUCTURE = 'roof';
+
+    function detectedStructures() {
+      const seen = [];
+      for (const r of state.rows) {
+        const sid = r.structure || null;
+        if (sid && !seen.includes(sid)) seen.push(sid);
+      }
+      return seen;
+    }
+
+    // v84: the buildings the GEOMETRY defines — the <ROOF id> blocks and their ROOF-face counts, parsed
+    // synchronously from the claim XML (a cheap regex, no bridge import). These are what a carrier line
+    // is MAPPED TO: the per-line selector offers them, so assigning a line to a building IS the XML->
+    // carrier mapping — set by the user, never guessed by the tool.
+    function xmlStructures() {
+      const claim = readClaimState();
+      const xml = String((claim && claim.xmlText) || '');
+      if (!xml) return [];
+      const out = [];
+      const roofRe = /<ROOF\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/ROOF>/g;
+      let m;
+      while ((m = roofRe.exec(xml)) !== null) {
+        const sid = m[1];
+        const faces = (m[2].match(/<FACE\b[^>]*\btype="ROOF"/g) || []).length;
+        out.push({ sid: sid, label: faces ? (sid + ' — ' + faces + ' facets') : sid });
+      }
+      return out;
+    }
+
+    // A mapping decision exists when the geometry has more than one building, OR the estimate names more
+    // than one. ONE building on both sides -> NOTHING TO DECIDE, no friction on the common case.
+    function structureChoiceRequired() {
+      return xmlStructures().length > 1 || detectedStructures().length > 1;
+    }
+
+    function structureProblems() {
+      if (!structureChoiceRequired()) return [];
+      const out = [];
+      const buildings = xmlStructures().map((o) => o.sid);
+      const names = buildings.length ? buildings : detectedStructures();
+      const unassigned = state.rows.filter((r) => r.in_scope && !r.structure);
+      if (unassigned.length) {
+        out.push(`${unassigned.length} in-scope line${unassigned.length === 1 ? '' : 's'} `
+          + `need${unassigned.length === 1 ? 's' : ''} a building: this roof has `
+          + `${names.length} buildings (${names.join(', ')}), so each line must say which `
+          + 'one it belongs to.');
+      }
+      // v84: the global "which structure do the measurements represent" gate is GONE. The comparison
+      // set is what the USER scoped, resolved per building from the per-line assignment above — there is
+      // no single structure to name, so nothing here forces that choice.
+      return out;
+    }
+
+    function showBanner(kind, html) {
+      const b = document.getElementById('parseBanner');
+      b.className = 'banner show ' + kind;
+      b.innerHTML = html;
+    }
+
+    async function load() {
+      const claim = readClaimState();
+      const text = (claim && claim.estimateText) || '';
+      state.estimateAttached = Boolean(claim && claim.carrierEstimatePresent);
+
+      // NO CARRIER ESTIMATE AT ALL — page 3 STILL RUNS. It is the only place claim information is ever
+      // collected, and the report mode is a consequence of the DATA (are there in-scope lines?), never
+      // of whether a PDF happened to be attached.
+      if (!state.estimateAttached && !text.trim()) {
+        state.status = 'NONE_ATTACHED';
+        state.rows = [];
+        showBanner('info', '<strong>No carrier estimate.</strong> '
+          + 'Add the line items below if you have a loss statement to compare against, or tick '
+          + '\u201cNo carrier comparison needed\u201d for a repair-scope report. '
+          + 'Either way, fill in the claim details \u2014 they go on the report.');
+        restorePriorConfirmation();
+        renderClaim(); renderRows(); updateSummary();
+        loadUnitList();   // v73 DEFECT 2: derive the hand-entry unit dropdown from the parser
+        return;
+      }
+
+      // v74 FIX — MANUAL ENTRY MUST NEVER WAIT ON THE ENGINE. Page 3 is pure JS for everything the
+      // user does here (claim fields, add/edit lines, disposition, "no comparison", Continue); only
+      // PREFILLING from the carrier estimate needs pyodide. Render the page interactive NOW, before
+      // awaiting ready()/parse, so a slow or stalled engine load (a re-init of pyodide+numpy+matplotlib
+      // on this page) can never leave the page dead. The parse below then prefills on top. Without
+      // this, a text-less/attached estimate (index hands page 3 empty text with the estimate flag set)
+      // stranded the user on a blank page with a disabled Continue.
+      renderClaim(); renderRows(); updateSummary();
+      loadUnitList();
+
+      try {
+        await ready();
+        const A = await parseCarrierEstimate(text);
+        state.status = A.status;
+        state.notes = A.notes || [];
+        const h = A.claim_header || {};
+        for (const k of Object.keys(state.claim)) {
+          // Layer A calls it `insured`; the field is now "Job / insured name", because the same table
+          // serves a claim AND a no-insurance repair job.
+          const src = (k === 'job_name') ? 'insured' : k;
+          const v = h[src];
+          state.claim[k] = (v === null || v === undefined) ? '' : String(v);
+        }
+        state.rows = rowsFromLayerA(A.lines || []);
+
+        const notesHtml = state.notes.length
+          ? '<ul>' + state.notes.map((n) => '<li>' + escapeHtml(n) + '</li>').join('') + '</ul>' : '';
+
+        if (A.status === 'TEXT_LAYER_ABSENT') {
+          // Say only what is TRUE. The user can upload any PDF; the tool does not know it was an
+          // estimate. If nothing usable parsed, there is simply nothing to compare — do not assert
+          // that "a carrier estimate exists but is unreadable".
+          showBanner('warn', '<strong>This looks like a scanned estimate \u2014 I couldn\u2019t read it '
+            + 'automatically.</strong> Add the lines below, or tick \u201cNo carrier comparison '
+            + 'needed\u201d if there is nothing to compare. The claim fields are blank; fill in what you can.');
+        } else if (A.status === 'PARSED') {
+          showBanner('info', '<strong>Read the estimate \u2014 ' + state.rows.length
+            + ' line item' + (state.rows.length === 1 ? '' : 's') + ' found.</strong> '
+            + 'The claim header was filled in below \u2014 check it and fix anything wrong.' + notesHtml);
+        } else {
+          const flagged = state.rows.filter((r) => r.needs_mapping).length;
+          showBanner('warn', '<strong>Partially read \u2014 ' + state.rows.length + ' line'
+            + (state.rows.length === 1 ? '' : 's') + ' found'
+            + (flagged ? ', ' + flagged + ' needing your attention' : '') + '.</strong> '
+            + 'What I could read is filled in below; please fill the gaps.' + notesHtml);
+        }
+      } catch (err) {
+        showBanner('warn', '<strong>I couldn\u2019t read the estimate automatically.</strong> '
+          + 'Add the lines below, or tick \u201cNo carrier comparison needed\u201d if there is nothing '
+          + 'to compare.');
+        state.status = 'TEXT_LAYER_ABSENT';
+      }
+      restorePriorConfirmation();
+      renderClaim(); renderRows(); updateSummary();
+    }
+
+    // Back-nav from page 4: prefer what the user already confirmed.
+    function restorePriorConfirmation() {
+      try {
+        const raw = sessionStorage.getItem('woodShakeWorkbench.carrierConfirmation');
+        const saved = raw ? JSON.parse(raw) : null;
+        if (!saved || !saved.claim) return;
+        // v68: only restore a confirmation that belongs to THIS claim. A snapshot from a previous claim
+        // (different estimate -> different signature) is DISCARDED, so its address/carrier never leak in
+        // and the freshly-parsed fields (blank where the estimate gave nothing) stand — which is exactly
+        // what the "not found in the file" banner promises.
+        if (saved.claimKey !== claimSignature()) return;
+        state.claim = { ...state.claim, ...saved.claim };
+        state.noComparison = Boolean(saved.noComparison);
+        // The asserted roof structure must survive back-nav from page 4, or the user is asked again.
+        if (saved.roofStructure) state.roofStructure = saved.roofStructure;
+        if (Array.isArray(saved.displayRows) && saved.displayRows.length) {
+          state.rows = saved.displayRows;
+          state.nextId = state.rows.length + 1;
+        }
+      } catch (_e) { /* fresh */ }
+    }
+
+    function renderClaimRequiredMarks() {
+      // The required SET changes with the mode, so the asterisks and the red highlights must follow it
+      // live — the same table serves an adjuster argument and a no-insurance repair calculation.
+      const need = requiredFields();
+      for (const [k, label] of CLAIM_FIELDS) {
+        const lab = document.getElementById(`l_${k}`);
+        const inp = document.getElementById(`f_${k}`);
+        if (!lab || !inp) continue;
+        const required = need.includes(k);
+        const blank = !String(state.claim[k] || '').trim();
+        lab.innerHTML = escapeHtml(label) + (required ? ' <span class="req">*</span>' : '');
+        inp.classList.toggle('missing', required && blank);
+        inp.placeholder = required ? 'Required' : 'Optional';
+      }
+    }
+
+    function renderClaim() {
+      const host = document.getElementById('claimFields');
+      host.innerHTML = CLAIM_FIELDS.map(([k, label, wide]) => `
+        <div class="field${wide ? ' wide' : ''}">
+          <label id="l_${k}" for="f_${k}">${escapeHtml(label)}</label>
+          <input id="f_${k}" data-k="${k}" value="${escapeHtml(state.claim[k] || '')}" />
+        </div>`).join('');
+      host.querySelectorAll('input').forEach((el) => {
+        el.addEventListener('input', () => {
+          state.claim[el.dataset.k] = el.value;
+          updateSummary();
+        });
+      });
+      const hint = document.getElementById('claimHint');
+      hint.textContent = (state.status === 'PARSED' || state.status === 'PARSED_PARTIAL')
+        ? 'Read from the estimate. Fix anything that\u2019s wrong.'
+        : 'Fill these in \u2014 they go on the report. Required fields depend on whether you are '
+          + 'comparing against a carrier estimate.';
+    }
+
+    function categoryHtml(row) {
+      if (row.category) return `<span class="cat">→ ${escapeHtml(catLabel(row.category))}</span>`;
+      if (row.needs_mapping) return `<span class="cat none">→ needs a category</span>`;
+      return `<span class="cat none">→ (not roof)</span>`;
+    }
+
+    function editorHtml(row, isNew) {
+      const flagged = Boolean(row.needs_mapping && !row.category);
+      return `<div class="editbox${flagged ? ' flagged' : ''}">
+        ${flagged ? '<div class="flagmsg">⚠ Needs mapping — I couldn\u2019t tell what this line is</div>' : ''}
+        <div class="editgrid">
+          <input class="full" data-e="desc" value="${escapeHtml(row.desc || '')}" placeholder="Description" />
+          <select data-e="category">
+            <option value="">Category…</option>
+            ${REGISTRY_28.map(c => `<option value="${c}" ${row.category === c ? 'selected' : ''}>${escapeHtml(catLabel(c))}</option>`).join('')}
+          </select>
+          <input data-e="qty" type="number" step="0.01" value="${row.qty ?? ''}" placeholder="Qty" />
+          <select data-e="unit">
+            ${UNITS.map(u => `<option value="${u}" ${row.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+          </select>
+          <select data-e="op" title="Operation (activity)">
+            <option value="">Operation: auto</option>
+            ${OPS.map(([v, l]) => `<option value="${v}" ${row.op === v ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="editacts">
+          <button class="btn primary small" data-e="save" type="button">${isNew ? 'Add line' : 'Save'}</button>
+          <button class="btn small" data-e="cancel" type="button">Cancel</button>
+        </div>
+      </div>`;
+    }
+
+    // Rendered ONLY when the estimate names more than one structure. In the common single-structure
+    // case this returns '' and the page looks exactly as it did — no added friction.
+    function structureHtml(row) {
+      if (!structureChoiceRequired()) return '';
+      const xstructs = xmlStructures();
+      const structs = xstructs.length ? xstructs : detectedStructures().map((sid) => ({ sid: sid, label: sid }));
+      const opts = ['<option value="">Which building? (required)</option>']
+        .concat(structs.map((o) => `<option value="${escapeHtml(o.sid)}"`
+          + `${row.structure === o.sid ? ' selected' : ''}>${escapeHtml(o.label)}</option>`))
+        .join('');
+      const missing = row.in_scope && !row.structure ? ' missing' : '';
+      // The selector's options are the roof's OWN buildings (ROOF ids). Assigning a carrier line to one
+      // is how the user maps this estimate's structure to the geometry — the tool never guesses it.
+      return `<div class="line-meta">Building `
+           + `<select class="rowstructure${missing}" data-id="${escapeHtml(row.id)}">${opts}</select></div>`;
+    }
+
+    // v84: a multi-building roof no longer forces ONE structure for the whole comparison. Every building
+    // the user scopes is compared on its own, so this banner is now INFORMATIONAL — it states how many
+    // buildings the geometry has and how the per-line Building selector maps carrier lines onto them. No
+    // global <select>, no gate. In the single-building case it renders nothing, exactly as before.
+    function renderStructureBanner() {
+      const host = document.getElementById('structureBanner');
+      if (!host) return;
+      if (!structureChoiceRequired()) { host.classList.remove('show'); host.innerHTML = ''; return; }
+      const xstructs = xmlStructures();
+      const names = (xstructs.length ? xstructs.map((o) => o.label) : detectedStructures());
+      host.innerHTML = `<strong>This roof has ${names.length} buildings `
+        + `(${escapeHtml(names.join(', '))}).</strong> `
+        + 'Assign each in-scope carrier line to the building it belongs to with the Building selector on '
+        + 'the line. Every building you scope is compared on its own; a building the carrier did not '
+        + 'estimate shows its required items as not present; a building you did not scope is acknowledged '
+        + 'out of scope.';
+      host.classList.add('show');
+    }
+
+    // v67: ONE definition of "decided", shared by the row rendering AND the Continue gate (rule 3 —
+    // replace the gate, never a parallel one). A line is decided when it is IN SCOPE with a category
+    // (a recognised roof line may ride Layer A's category proposal — it will be compared, so there is
+    // no under-scope risk), OR the user has ASSERTED exterior/interior. Marking a line OUT of scope is
+    // the under-scope direction, so it always requires the user's own assertion, never a silent
+    // proposal. 'undecided' always blocks. Nothing clears the gate silently.
+    function isDecided(row) {
+      if (row.disposition === 'in_scope') return Boolean(row.category);
+      if (row.disposition === 'exterior' || row.disposition === 'interior') return Boolean(row.disposition_asserted);
+      return false;
+    }
+
+    function renderRows() {
+      const host = document.getElementById('lineList');
+      if (!state.rows.length && !state.editing) {
+        host.innerHTML = '<div class="empty">No line items yet. Use <strong>+ Add line item</strong> below to enter them.</div>';
+        return;
+      }
+      host.innerHTML = state.rows.map((row) => {
+        const decided = isDecided(row);
+        const undecided = !decided;
+        // a disposition proposed by Layer A but not yet asserted by the user (out-of-scope side only)
+        const proposedOut = (row.disposition === 'exterior' || row.disposition === 'interior') && !row.disposition_asserted;
+        // show the category editor when this line is in scope and still needs a category
+        const needsCat = row.disposition === 'in_scope' && !row.category;
+        const editing = state.editing === row.id;
+        const cls = 'line' + (row.disposition === 'in_scope' ? '' : ' out') + (undecided ? ' needs' : '');
+        const dispBtn = (val, label) =>
+          `<button type="button" data-id="${row.id}" data-action="disp" data-disp="${val}" `
+          + `class="${row.disposition === val ? 'on' + (proposedOut && (val === 'exterior' || val === 'interior') ? ' proposed' : '') : ''}">`
+          + `${label}</button>`;
+        return `<div class="${cls}" data-row="${row.id}">
+          <div class="line-head">
+            <div class="line-main">
+              <div class="line-desc">${escapeHtml(row.label)}. ${escapeHtml(row.desc)}</div>
+              <div class="line-meta">${escapeHtml(Number(row.qty).toFixed(2))} ${escapeHtml(row.unit)}${row.op && row.in_scope ? ` &middot; <span class="op-badge">${escapeHtml(OP_LABEL[row.op] || row.op)}</span>` : ''}</div>
+              ${categoryHtml(row)}
+              ${structureHtml(row)}
+              ${row.pair_note ? `<div class="pairnote">${escapeHtml(row.pair_note)}</div>` : ''}
+              ${proposedOut ? '<div class="pairnote">Proposed out of scope — confirm the disposition (or use the batch buttons).</div>' : ''}
+              ${row.disposition === 'undecided' ? '<div class="pairnote">Not identified — choose a disposition for this line.</div>' : ''}
+              ${editing ? '' : `<div class="rowacts">
+                 <button data-id="${row.id}" data-action="edit" type="button">Edit</button>
+                 <button data-id="${row.id}" data-action="delete" class="del" type="button">Delete</button>
+               </div>`}
+            </div>
+            <div class="toggle" role="group" aria-label="Disposition for line ${escapeHtml(row.label)}">
+              ${dispBtn('in_scope', 'In scope (roof)')}
+              ${dispBtn('exterior', 'Not roof — exterior')}
+              ${dispBtn('interior', 'Not roof — interior')}
+            </div>
+          </div>
+          ${editing ? editorHtml(row, false) : (needsCat ? editorHtml(row, false) : '')}
+        </div>`;
+      }).join('');
+
+      if (state.editing === 'NEW') {
+        const blank = { id: 'NEW', desc: '', qty: '', unit: 'SQ', category: '', needs_mapping: false };
+        host.insertAdjacentHTML('beforeend',
+          `<div class="line" data-row="NEW"><div class="line-desc">New line item</div>${editorHtml(blank, true)}</div>`);
+      }
+      wireRows();
+    }
+
+    function wireRows() {
+      const host = document.getElementById('lineList');
+      host.querySelectorAll('select.rowstructure').forEach((sel) => {
+        sel.addEventListener('change', () => {
+          const row = state.rows.find((r) => String(r.id) === String(sel.dataset.id));
+          if (!row) return;
+          row.structure = sel.value || null;
+          renderRows(); updateSummary();
+        });
+      });
+      host.querySelectorAll('button[data-action]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const row = state.rows.find(r => r.id === b.dataset.id);
+          if (!row) return;
+          const act = b.dataset.action;
+          if (act === 'disp') {
+            // v67: the user ASSERTS a disposition. This is the decision the gate asks for. Setting
+            // 'in_scope' keeps/asks a category; 'exterior'/'interior' is an asserted out-of-scope
+            // decision (never a silent default). Everything stays overridable — click again to change.
+            const val = b.dataset.disp;
+            row.disposition = val;
+            row.disposition_asserted = true;
+            row.in_scope = (val === 'in_scope');
+            if (val !== 'in_scope') { row.category = ''; }
+            else if (row.category) { row.needs_mapping = false; }
+          }
+          else if (act === 'edit') { state.editing = row.id; }
+          else if (act === 'delete') {
+            state.rows = state.rows.filter(r => r.id !== row.id);
+            if (state.editing === row.id) state.editing = null;
+          }
+          renderRows(); updateSummary();
+        });
+      });
+
+      host.querySelectorAll('[data-row]').forEach((box) => {
+        const id = box.dataset.row;
+        const save = box.querySelector('[data-e="save"]');
+        const cancel = box.querySelector('[data-e="cancel"]');
+        if (!save) return;
+        const read = () => ({
+          desc: box.querySelector('[data-e="desc"]').value.trim(),
+          category: box.querySelector('[data-e="category"]').value,
+          qty: Number(box.querySelector('[data-e="qty"]').value),
+          unit: box.querySelector('[data-e="unit"]').value,
+          op: box.querySelector('[data-e="op"]').value    // '' => auto-derive from the description
+        });
+        save.addEventListener('click', async () => {
+          const v = read();
+          if (!v.desc || !Number.isFinite(v.qty) || v.qty <= 0) return;
+          // v73 DEFECT 1: the operation is the user's explicit choice, else DERIVED from the typed
+          // description by the ONE authority. Source-line side follows the resolved op so the engine
+          // reads the same activity (a hand-typed "Material Only …" is compared as MATERIAL_ONLY).
+          const op = v.op || await deriveOp(v.desc, v.category);
+          const src = [{ side: sideForOp(op, v.desc, v.category), qty: v.qty }];
+          if (id === 'NEW') {
+            state.rows.push({
+              id: 'r' + (state.nextId++), label: String(state.rows.length + 1),
+              desc: v.desc, qty: v.qty, unit: v.unit, category: v.category,
+              disposition: v.category ? 'in_scope' : 'undecided',
+              disposition_asserted: Boolean(v.category),
+              in_scope: Boolean(v.category), needs_mapping: false,
+              op: op,
+              source_lines: src
+            });
+          } else {
+            const row = state.rows.find(r => r.id === id);
+            if (row) {
+              row.desc = v.desc; row.qty = v.qty; row.unit = v.unit; row.category = v.category;
+              row.op = op;
+              // Choosing a category asserts the in-scope disposition (a category is the decision).
+              if (v.category) { row.disposition = 'in_scope'; row.disposition_asserted = true; row.in_scope = true; row.needs_mapping = false; }
+              // a single-line row's source side follows its (possibly corrected) description/operation
+              if (!row.pair_note) row.source_lines = src;
+            }
+          }
+          state.editing = null;
+          renderRows(); updateSummary();
+        });
+        if (cancel) cancel.addEventListener('click', () => { state.editing = null; renderRows(); updateSummary(); });
+      });
+    }
+
+    document.getElementById('addLineBtn').addEventListener('click', () => {
+      state.editing = 'NEW'; renderRows();
+      const el = document.querySelector('[data-row="NEW"] [data-e="desc"]');
+      if (el) el.focus();
+    });
+
+    // v67 BATCH — a decision, not a bypass. Sets a REAL disposition on every remaining undecided line
+    // (undecided or a still-unconfirmed out-of-scope proposal). A line the user has already put in scope
+    // (pending its category) is left alone, so batch never silently pulls a roof line out of scope.
+    function batchDisposition(side) {
+      let changed = 0;
+      for (const r of state.rows) {
+        if (!isDecided(r) && r.disposition !== 'in_scope') {
+          r.disposition = side; r.disposition_asserted = true; r.in_scope = false; r.category = '';
+          changed++;
+        }
+      }
+      if (changed) { renderRows(); updateSummary(); }
+    }
+    document.getElementById('batchExterior').addEventListener('click', () => batchDisposition('exterior'));
+    document.getElementById('batchInterior').addEventListener('click', () => batchDisposition('interior'));
+
+    // GATE — NOTHING REACHES CONTINUE UNDECIDED (v67).
+    // Every carrier line carries a disposition and must be DECIDED (isDecided, defined once above):
+    // in scope WITH a category, or the user's asserted exterior/interior. An unidentified line proposes
+    // 'undecided' and BLOCKS — nothing defaults silently out of scope, which is the invisible under-scope
+    // this tool exists to prevent. Deleting a line is never required; a disposition is always available.
+    const undecidedFlagged = () => state.rows.filter((r) => !isDecided(r));
+
+    // A line marked in scope without a category is still unusable (also caught by isDecided).
+    const unmappedInScope = () => state.rows.filter((r) => r.disposition === 'in_scope' && !r.category);
+
+    const inScopeRows = () => state.rows.filter((r) => r.disposition === 'in_scope' && r.category);
+
+    // THE ONE AUTHORITY for the report mode. v87: page 4 acts on THIS, carried in the confirmation
+    // payload — it never re-derives the mode from the in-scope row count. An estimate with carrier lines
+    // but zero in-scope roof lines is a COMPARISON (every required item missing); only a genuine
+    // no-estimate with the acknowledgment ticked is a repair-scope report.
+    function computeMode() {
+      const inScope = inScopeRows();
+      return (inScope.length || state.rows.length) ? 'comparison'
+           : (state.noComparison ? 'repair-scope' : null);
+    }
+
+    const missingRequired = () => requiredFields()
+      .filter((k) => !String(state.claim[k] || '').trim());
+
+    // GATE (c) — MUTUAL EXCLUSION. Adding an in-scope line clears the acknowledgment; ticking the
+    // acknowledgment means the line table is not required. v66: the tick is for the GENUINE no-estimate
+    // case only. If a carrier estimate IS present (any lines) but scopes ZERO roof work, that is the
+    // strongest available argument — it must produce a COMPARISON with every required item missing, not
+    // a repair-scope report — so the tick is disabled whenever any carrier line has been entered.
+    function syncAcknowledgment() {
+      if (state.rows.length && state.noComparison) state.noComparison = false;
+      const box = document.getElementById('noComparison');
+      if (box) {
+        box.checked = state.noComparison;
+        box.disabled = state.rows.length > 0;   // an estimate is present -> it must be compared
+        box.parentElement.classList.toggle('disabled', box.disabled);
+        box.parentElement.classList.toggle('done', state.noComparison);
+      }
+    }
+
+    // v68 ONE AUTHORITY — the single definition of "why Continue is blocked", returning the array of
+    // reasons. BOTH the gate (updateSummary, which disables the button and shows the reasons) and the
+    // click handler (which refuses only when this is non-empty) call it. This project's signature bug is
+    // one rule in two copies with only one updated; here that is impossible — there is one copy. Follows
+    // the isDecided pattern: defined once, used by the render AND the gate.
+    function continueBlockers() {
+      const problems = [];
+      const flagged = undecidedFlagged();
+      if (flagged.length) {
+        problems.push(`${flagged.length} carrier line${flagged.length === 1 ? '' : 's'} still `
+          + `need${flagged.length === 1 ? 's' : ''} a disposition: mark `
+          + `${flagged.length === 1 ? 'it' : 'each'} in scope (with a category), not roof — exterior, `
+          + `or not roof — interior. Use the batch buttons to set the remaining lines at once.`);
+      }
+      const unmapped = unmappedInScope();
+      if (unmapped.length) {
+        problems.push(`${unmapped.length} in-scope line${unmapped.length === 1 ? '' : 's'} still `
+          + `need${unmapped.length === 1 ? 's' : ''} a category.`);
+      }
+      if (!inScopeRows().length && !state.rows.length && !state.noComparison) {
+        problems.push('Add at least one carrier line item, or tick '
+          + '"No carrier comparison needed — this is a repair-scope report".');
+      }
+      for (const p of structureProblems()) problems.push(p);
+      const missing = missingRequired();
+      if (missing.length) {
+        problems.push((state.noComparison ? 'For a repair-scope report, still needed: '
+                                          : 'Required for a carrier comparison: ')
+          + missing.map((k) => FIELD_LABEL[k] || k).join(', ') + '.');
+      }
+      return problems;
+    }
+
+    function showBlockers(problems) {
+      const box = document.getElementById('blockMsg');
+      box.classList.toggle('show', problems.length > 0);
+      box.textContent = problems.join(' ');
+    }
+
+    function updateSummary() {
+      syncAcknowledgment();
+      const inScope = inScopeRows();
+      const mode = computeMode();   // v87: the one authority (also carried to page 4 in the payload)
+
+      document.getElementById('scopeSummary').textContent = state.rows.length
+        ? `${inScope.length} of ${state.rows.length} line${state.rows.length === 1 ? '' : 's'} in scope for the comparison.`
+        : 'No carrier lines yet.';
+      document.getElementById('barCount').textContent = mode === 'repair-scope'
+        ? 'repair-scope report'
+        : `${inScope.length} in scope`;
+
+      // THE THREE CONDITIONS — computed by the ONE authority, so the gate and the click handler
+      // can never disagree again.
+      // show the batch buttons only while there are remaining undecided/proposed-out lines to set
+      const batchable = state.rows.filter((r) => !isDecided(r) && r.disposition !== 'in_scope').length;
+      const batchBar = document.getElementById('batchBar');
+      if (batchBar) batchBar.style.display = batchable ? 'flex' : 'none';
+
+      const problems = continueBlockers();
+      showBlockers(problems);
+      document.getElementById('continueBtn').disabled = problems.length > 0;
+      renderClaimRequiredMarks();
+      renderStructureBanner();
+      updateMixedOpNotice();          // v75: async — flag categories the engine will split by operation
+    }
+
+    // v75: when a category carries more than one carrier operation (e.g. Detach & Reset PLUS new
+    // material), the report will SPLIT it and show each — but the user must SEE that here, on the
+    // confirmation page, not discover it in a delivered report. Uses the same engine partition (one
+    // authority) over the bridge; a stale/absent bridge simply shows nothing.
+    let _mixedOpToken = 0;
+    async function updateMixedOpNotice() {
+      const el = document.getElementById('mixedOpNotice');
+      if (!el) return;
+      const token = ++_mixedOpToken;
+      let mixed = [];
+      try { mixed = await mixedOperationCategories(engineRows()); } catch (e) { mixed = []; }
+      if (token !== _mixedOpToken) return;   // a newer edit superseded this check
+      if (Array.isArray(mixed) && mixed.length) {
+        const names = mixed.map(m => catLabel(m.category_id)).join(', ');
+        el.textContent = 'Heads up — the carrier funded more than one operation on: ' + names
+          + '. The report will list each operation separately (e.g. Detach & Reset and new material); '
+          + 'confirm the lines are entered as the carrier wrote them.';
+        el.style.display = '';
+      } else {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+    }
+
+    // Manual-entry rows for the engine. The shake row keeps its source_lines so the operation
+    // dimension infers DETACH_RESET from the Remove+Install pairing.
+    function engineRows() {
+      return state.rows.filter(r => r.in_scope && r.category).map((r) => ({
+        category_id: r.category, qty: Number(r.qty), unit: r.unit, status: 'Approved',
+        // STRUCTURE, NOT A HARD-CODED 'roof'. This line used to send structure_id:'roof' for EVERY
+        // row, which is why "one roof, two ridge runs — SUM them" and "dwelling + detached garage —
+        // KEEP THEM SEPARATE" were indistinguishable downstream. They are opposite answers.
+        op: r.op || 'R&R', structure_id: r.structure || DEFAULT_STRUCTURE, estimate_id: 'manual_1',
+        source_lines: r.source_lines
+      }));
+    }
+
+    document.getElementById('continueBtn').addEventListener('click', () => {
+      // ONE AUTHORITY: refuse iff the SAME function the gate uses reports a reason. And if it ever does
+      // refuse, SAY SO — a silent return on a button the user can press is never acceptable. Surface the
+      // reasons the gate would show and scroll them into view. (The gate normally disables the button,
+      // so this path is defensive; it must still never fail silently.)
+      const blockers = continueBlockers();
+      if (blockers.length) {
+        showBlockers(blockers);
+        updateSummary();
+        const box = document.getElementById('blockMsg');
+        if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const c = state.claim;
+      // `insured` is what the report's §1 prints. In a pure repair job it is the job/owner name; in a
+      // claim it is the insured. One field, honestly labelled "Job / insured name".
+      const vci = {
+        insured: c.job_name, loss_address: c.loss_address, claim_number: c.claim_number,
+        policy_number: c.policy_number, type_of_loss: c.type_of_loss, date_of_loss: c.date_of_loss,
+        deductible: c.deductible || null,        // may be a string — the report renderer coerces safely
+        carrier: c.carrier, jurisdiction_code: '',
+        // v72 DEFECT 3: the price list drives deterministic platform detection in the live path.
+        price_list: c.price_list || '',
+        // v72 DEFECT 2 (no-haul-off): EVERY parsed carrier line description (all dispositions, since the
+        // dumpster line is usually out of scope and never reaches the approved rows) so the engine can
+        // detect a removal with no disposal and state the gap in §5.
+        carrier_line_descriptions: (state.rows || []).map(r => r.desc || ''),
+        // v84: there is no single "which structure the XML represents" anymore — every building the user
+        // scopes is compared on its own, resolved per building from the per-line assignment. So no global
+        // structure id is asserted here; the comparison set comes from what was scoped, not from this.
+        roof_structure_id: null,
+        confirmed: true                          // TRUE because the user actually confirmed it here
+      };
+      sessionStorage.setItem('woodShakeWorkbench.carrierConfirmation', JSON.stringify({
+        vci, claim: c, price_list: c.price_list,
+        claimKey: claimSignature(),              // v68: ties this confirmation to THIS claim's estimate
+        rows: engineRows(),                      // in-scope ROOF rows only (keyed by the engine)
+        // v87: page 4 must act on THE MODE computed here, not re-derive it from rows.length. An estimate
+        // with carrier lines but zero in-scope roof lines yields rows: [] yet mode: 'comparison' — the
+        // strongest comparison, every required item missing. These four carry the distinction page 4 needs:
+        mode: computeMode(),                     // 'comparison' | 'repair-scope' | null — the one authority
+        estimateAttached: Boolean(state.estimateAttached),
+        carrierLineCount: state.rows.length,     // all parsed/entered carrier lines (not just in-scope)
+        parseStatus: state.status,               // 'NONE_ATTACHED' | 'TEXT_LAYER_ABSENT' | 'PARSED' | ...
+        displayRows: state.rows,               // each row carries its `structure` + `disposition` -> survives restore
+        roofStructure: state.roofStructure || null,
+        // v67: the USER'S asserted out-of-scope dispositions, for the report's §7 acknowledgment.
+        nonRoof: { exterior: state.rows.filter(r => r.disposition === 'exterior').length,
+                   interior: state.rows.filter(r => r.disposition === 'interior').length },
+        noComparison: state.noComparison,
+        confirmedAt: new Date().toISOString()
+      }));
+      window.location.href = './page4.html';
+    });
+
+    document.getElementById('noComparison').addEventListener('change', function () {
+      state.noComparison = this.checked;
+      updateSummary();          // the REQUIRED claim set changes with the mode
+    });
+
+    load();
+  </script>
+</body>
+</html>
